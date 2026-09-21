@@ -1,0 +1,7 @@
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30
+orjson>=3.10
+redis>=5.0
+cryptography>=43
+pyyaml>=6.0
+prometheus-client>=0.20

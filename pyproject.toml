@@ -1,0 +1,17 @@
+[project]
+name = "pd-masking-service"
+version = "1.0.0"
+description = "Модуль безопасности персональных данных для LLM: идентификация, маскирование, демаскирование"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003", "SIM905", "UP042"]  # кириллица в строках и комментариях — ожидаема

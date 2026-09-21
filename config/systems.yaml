@@ -1,0 +1,73 @@
+# Настройка систем-потребителей модуля безопасности ПД.
+#
+# Инструкция (≤ 5 предложений):
+# 1. Новая система — блок в `systems` с уникальным ID; она передаёт его в заголовке X-System-Id.
+# 2. `enabled: false` мгновенно закрывает системе доступ (ответ 403).
+# 3. `pd_types` — список типов ПД для поиска и маскирования (`all` — все типы).
+# 4. `unmask` разрешает или запрещает демаскирование, `masking` переопределяет вид маски по типам.
+# 5. `require_combination` включает маскирование типа только вместе с другим (PIN — только при номере карты); после правки перезапустите сервис.
+#
+# Стратегии: initials | partial | full | email | token | redact | synthetic
+
+# Система, которой считаются запросы без заголовка X-System-Id (автопроверка).
+default_system: default
+
+# Вид маски по умолчанию для всех систем.
+masking:
+  fio:                 {strategy: initials}
+  card_holder:         {strategy: initials}
+  passport:            {strategy: partial, keep_start: 2, keep_end: 2}
+  driver_license:      {strategy: partial, keep_start: 2, keep_end: 2}
+  foreign_passport:    {strategy: partial, keep_start: 2, keep_end: 2}
+  military_id:         {strategy: partial, keep_start: 2, keep_end: 2}
+  birth_certificate:   {strategy: partial, keep_start: 2, keep_end: 2}
+  snils:               {strategy: partial, keep_start: 2, keep_end: 2}
+  inn:                 {strategy: partial, keep_start: 2, keep_end: 2}
+  phone:               {strategy: partial, keep_start: 2, keep_end: 2}
+  card_number:         {strategy: partial, keep_start: 4, keep_end: 4}
+  department_code:     {strategy: full}
+  email:               {strategy: email}
+  cvv:                 {strategy: full}
+  pin:                 {strategy: full}
+  card_expiry:         {strategy: full}
+  birth_date:          {strategy: full}
+  passport_issue_date: {strategy: full}
+  date:                {strategy: full}
+  birth_place:         {strategy: full}
+  citizenship:         {strategy: full}
+  passport_issuer:     {strategy: full}
+  address:             {strategy: full}
+
+systems:
+  # Автопроверка и потребители без собственных настроек.
+  default:
+    enabled: true
+    pd_types: all
+    unmask: true
+
+  # Чат-бот поддержки: ответы LLM демаскируются, маска в виде токенов понятна модели.
+  support-bot:
+    enabled: true
+    pd_types: [fio, phone, email, card_number, cvv, pin, card_holder, card_expiry, address]
+    unmask: true
+    masking:
+      fio:   {strategy: token}
+      phone: {strategy: token}
+      email: {strategy: token}
+    require_combination:
+      pin: [card_number]
+      cvv: [card_number]
+
+  # Аналитика: демаскирование запрещено, ПД заменяются синтетикой.
+  analytics:
+    enabled: true
+    pd_types: all
+    unmask: false
+    masking:
+      fio:         {strategy: synthetic}
+      phone:       {strategy: synthetic}
+      card_number: {strategy: synthetic}
+
+  # Выведенная из эксплуатации система: доступ закрыт.
+  legacy-crm:
+    enabled: false
