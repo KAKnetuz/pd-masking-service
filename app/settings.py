@@ -71,7 +71,7 @@ class Settings:
             redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
             redis_timeout_seconds=_float("REDIS_TIMEOUT_SECONDS", 2.0),
             redis_max_connections=_int("REDIS_MAX_CONNECTIONS", 128),
-            mapping_ttl_seconds=_int("MAPPING_TTL_SECONDS", 3600),
+            mapping_ttl_seconds=_int("MAPPING_TTL_SECONDS", 900),
             encryption_key=os.environ.get("ENCRYPTION_KEY", ""),
             token_secret=os.environ.get("TOKEN_SECRET", ""),
             systems_config=os.environ.get("SYSTEMS_CONFIG", "config/systems.yaml"),

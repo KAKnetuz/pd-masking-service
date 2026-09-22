@@ -25,7 +25,7 @@ services:
   redis:
     image: redis:7-alpine
     # Только оперативная память: ПД не сохраняются на диск, записи живут TTL.
-    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "1gb",
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "4gb",
               "--maxmemory-policy", "volatile-ttl"]
     restart: unless-stopped
     healthcheck:
