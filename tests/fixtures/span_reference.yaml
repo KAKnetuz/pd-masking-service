@@ -885,3 +885,134 @@
   title: Ловушка горячая линия
   text: "Тел. горячей линии 8 800 100-00-00"
   expected: []
+
+# --- Регистр и одиночные слова ---------------------------------------------
+- id: 124
+  title: Гражданство россия нижний регистр
+  text: "россия"
+  expected:
+    - type: citizenship
+      parts: ["россия"]
+
+- id: 125
+  title: Гражданство РОССИЯ верхний регистр
+  text: "РОССИЯ"
+  expected:
+    - type: citizenship
+      parts: ["РОССИЯ"]
+
+- id: 126
+  title: Гражданство Российская федерация
+  text: "Российская федерация"
+  expected:
+    - type: citizenship
+      parts: ["Российская федерация"]
+
+- id: 127
+  title: Дата месяц с заглавной
+  text: "15 Марта 1990"
+  expected:
+    - type: date
+      parts: ["15 Марта 1990"]
+
+- id: 128
+  title: Дата месяц верхний регистр
+  text: "15 МАРТА 1990"
+  expected:
+    - type: date
+      parts: ["15 МАРТА 1990"]
+
+- id: 129
+  title: ВУ серия нижний регистр
+  text: "77 аа 123456"
+  expected:
+    - type: driver_license
+      parts: ["77 аа 123456"]
+
+- id: 130
+  title: Одиночная фамилия
+  text: "Иванов"
+  expected:
+    - type: fio
+      parts: ["Иванов"]
+
+- id: 131
+  title: Одиночное имя
+  text: "Иван"
+  expected:
+    - type: fio
+      parts: ["Иван"]
+
+- id: 132
+  title: Одиночное отчество
+  text: "Ивановна"
+  expected:
+    - type: fio
+      parts: ["Ивановна"]
+
+- id: 133
+  title: Одиночная фамилия нижний регистр
+  text: "иванов"
+  expected:
+    - type: fio
+      parts: ["иванов"]
+
+- id: 134
+  title: Одиночный город Москва
+  text: "Москва"
+  expected:
+    - type: address
+      parts: ["Москва"]
+
+- id: 135
+  title: Одиночный город краснодар
+  text: "краснодар"
+  expected:
+    - type: address
+      parts: ["краснодар"]
+
+- id: 136
+  title: Одиночный город Санкт-Петербург
+  text: "Санкт-Петербург"
+  expected:
+    - type: address
+      parts: ["Санкт-Петербург"]
+
+- id: 137
+  title: Держатель смешанный регистр
+  text: "Ivan Petrov"
+  expected:
+    - type: card_holder
+      parts: ["Ivan Petrov"]
+
+- id: 138
+  title: Держатель нижний регистр
+  text: "ivan petrov"
+  expected:
+    - type: card_holder
+      parts: ["ivan petrov"]
+
+- id: 139
+  title: Ловушка Пушкин одиночный
+  text: "Пушкин"
+  expected: []
+
+- id: 140
+  title: Ловушка Толстой одиночный
+  text: "Толстой"
+  expected: []
+
+- id: 141
+  title: Ловушка магазин
+  text: "магазин"
+  expected: []
+
+- id: 142
+  title: Ловушка VISA CARD
+  text: "VISA CARD"
+  expected: []
+
+- id: 143
+  title: Ловушка историческая дата
+  text: "01.01.1799"
+  expected: []

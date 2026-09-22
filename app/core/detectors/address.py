@@ -16,6 +16,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 from app.core.detectors.base import FLAGS, Detector, cue_before
+from app.core.detectors.names_data import CITIES
 from app.core.entities import Entity, PDType, make_entity
 
 _NB = r"(?<![А-Яа-яЁё])"  # граница слова для кириллицы
@@ -107,15 +108,6 @@ _COMPONENT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 # Номер дома сразу после названия улицы (через запятую или пробел): «ул. Красная, 10», «ул Красная 10-5».
 _BARE_HOUSE_RE = re.compile(r"\s*[,]?\s*(\d{1,4}(?:-\d{1,4})?[А-Яа-я]?)(?!\d)")
 
-_CITIES = frozenset(
-    """
-    москва санкт-петербург новосибирск екатеринбург казань челябинск самара омск ростов-на-дону
-    уфа красноярск воронеж пермь волгоград краснодар саратов тюмень тольятти ижевск барнаул ульяновск
-    иркутск хабаровск ярославль владивосток махачкала томск оренбург кемерово новокузнецк рязань астрахань
-    пенза липецк киров чебоксары калининград тула курск сочи ставрополь севастополь симферополь минск
-    алматы астана ташкент бишкек ереван баку тбилиси
-    """.split()
-) | {"нижний новгород"}
 _LOCALITY_RE = re.compile(r"(?-i:[А-ЯЁ][а-яё]+(?:-на-[А-ЯЁ][а-яё]+|-[А-ЯЁ][а-яё]+|\s+Новгород)?)")
 
 _GAP_RE = re.compile(r"[\s,;]{0,4}")
@@ -222,7 +214,7 @@ class AddressDetector(Detector):
         """Город без «г.» внутри адреса: «123456, Москва, ул. Ленина»."""
         extra: list[_Component] = []
         for m in _LOCALITY_RE.finditer(text):
-            if m.group(0).lower() not in _CITIES:
+            if m.group(0).lower() not in CITIES:
                 continue
             if any(c.start <= m.start() < c.end for c in components):
                 continue
