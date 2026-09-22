@@ -10,11 +10,11 @@ import logging
 import time
 import uuid
 
-import orjson
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from app.api.responses import json_response
 from app.core.chat_proxy import LeakBlockedError
 from app.core.policy import SystemNotAllowedError
 from app.llm.client import LLMUnavailableError
@@ -26,10 +26,6 @@ router = APIRouter()
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1)
-
-
-def json_response(body: dict[str, object], status: int = 200, headers: dict[str, str] | None = None) -> Response:
-    return Response(orjson.dumps(body), status_code=status, media_type="application/json", headers=headers)
 
 
 @router.post("/chat")
@@ -44,7 +40,7 @@ async def chat(body: ChatRequest, request: Request) -> Response:
         return json_response({"detail": "message слишком большой"}, 413)
 
     # Заголовок системы обязателен для /chat.
-    if system_id is None:
+    if not system_id:
         log.warning("system_header_missing", extra={"request_id": request_id})
         return json_response({"detail": "система не допущена к сервису"}, 403)
     try:

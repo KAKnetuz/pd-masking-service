@@ -6,11 +6,11 @@ import logging
 import time
 import uuid
 
-import orjson
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from app.api.responses import json_response
 from app.core.policy import SystemNotAllowedError
 from app.core.processor import UnmaskForbiddenError
 from app.observability.metrics import LATENCY, PD_FOUND, REJECTED, REQUESTS, TOKENS, estimate_tokens
@@ -22,10 +22,6 @@ router = APIRouter()
 class ProcessRequest(BaseModel):
     payload: str
     payload_id: str = Field(min_length=1)
-
-
-def json_response(body: dict[str, object], status: int = 200, headers: dict[str, str] | None = None) -> Response:
-    return Response(orjson.dumps(body), status_code=status, media_type="application/json", headers=headers)
 
 
 @router.post("/process")

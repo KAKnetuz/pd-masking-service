@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from app.core.engine import DetectionEngine
 from app.core.masking import Masker, unmask_fragments
 from app.core.policy import SystemPolicy
+from app.llm.client import LLMClient
 
 _SYSTEM_PROMPT = (
     "Ты ассистент банка. Персональные данные в тексте заменены метками вида "
@@ -35,7 +36,7 @@ class ChatResult:
 
 
 class ChatProxy:
-    def __init__(self, engine: DetectionEngine, masker: Masker, llm_client) -> None:
+    def __init__(self, engine: DetectionEngine, masker: Masker, llm_client: LLMClient) -> None:
         self._engine = engine
         self._masker = masker
         self._llm = llm_client

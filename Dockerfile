@@ -12,6 +12,7 @@ RUN pip install -r requirements.txt
 
 COPY app ./app
 COPY config ./config
+COPY certs ./certs
 COPY --chmod=755 scripts/entrypoint.sh /entrypoint.sh
 
 RUN useradd --system --uid 10001 appuser

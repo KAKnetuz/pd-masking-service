@@ -37,6 +37,8 @@ class LLMUnavailableError(Exception):
 class LLMClient(Protocol):
     async def complete(self, messages: list[dict[str, str]]) -> str: ...
 
+    async def aclose(self) -> None: ...
+
 
 class AlfaGenClient:
     """Клиент AlfaGen: один AsyncClient на процесс, SSE-поток, склейка delta.content."""

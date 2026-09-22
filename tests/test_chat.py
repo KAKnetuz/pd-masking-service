@@ -121,6 +121,19 @@ def test_missing_system_header_forbidden() -> None:
         _close(client)
 
 
+def test_empty_system_header_forbidden() -> None:
+    fake = FakeLLM()
+    client, _ = _client(fake)
+    try:
+        response = client.post(
+            "/chat", json={"message": "привет"}, headers={"X-System-Id": ""}
+        )
+        assert response.status_code == 403
+        assert fake.calls == 0
+    finally:
+        _close(client)
+
+
 def test_unmask_disabled_system_forbidden() -> None:
     fake = FakeLLM()
     client, _ = _client(fake)
