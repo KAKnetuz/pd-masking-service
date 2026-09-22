@@ -5,3 +5,4 @@ redis>=5.0
 cryptography>=43
 pyyaml>=6.0
 prometheus-client>=0.20
+httpx>=0.28,<0.29

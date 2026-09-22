@@ -23,6 +23,38 @@ class Settings:
     max_payload_id_chars: int
     max_inflight: int
     log_level: str
+    llm_provider: str
+    llm_base_url: str
+    llm_model: str
+    llm_api_key: str
+    llm_timeout_seconds: int
+    llm_ca_bundle: str
+
+    def __repr__(self) -> str:
+        return self._public_repr()
+
+    def __str__(self) -> str:
+        return self._public_repr()
+
+    def _public_repr(self) -> str:
+        """repr/str без секретов: ключ LLM не показывается."""
+        fields = {
+            "storage_backend": self.storage_backend,
+            "redis_url": self.redis_url,
+            "mapping_ttl_seconds": self.mapping_ttl_seconds,
+            "systems_config": self.systems_config,
+            "system_header": self.system_header,
+            "max_payload_chars": self.max_payload_chars,
+            "max_payload_id_chars": self.max_payload_id_chars,
+            "max_inflight": self.max_inflight,
+            "log_level": self.log_level,
+            "llm_provider": self.llm_provider,
+            "llm_base_url": self.llm_base_url,
+            "llm_model": self.llm_model,
+            "llm_timeout_seconds": self.llm_timeout_seconds,
+            "llm_ca_bundle": self.llm_ca_bundle,
+        }
+        return f"Settings({fields!r})"
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -38,4 +70,14 @@ class Settings:
             max_payload_id_chars=_int("MAX_PAYLOAD_ID_CHARS", 256),
             max_inflight=_int("MAX_INFLIGHT", 512),
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
+            llm_provider=os.environ.get("LLM_PROVIDER", "stub"),
+            llm_base_url=os.environ.get(
+                "LLM_BASE_URL", "https://alfagen.alfabank.ru/continue-dev/v1"
+            ),
+            llm_model=os.environ.get("LLM_MODEL", "deepseek-ai/DeepSeek-V4-Flash-0731"),
+            llm_api_key=os.environ.get("LLM_API_KEY", ""),
+            llm_timeout_seconds=_int("LLM_TIMEOUT_SECONDS", 30),
+            llm_ca_bundle=os.environ.get(
+                "LLM_CA_BUNDLE", "certs/russian_trusted_ca_chain.pem"
+            ),
         )
