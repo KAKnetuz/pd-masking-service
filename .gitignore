@@ -12,3 +12,5 @@ coverage/
 .coverage
 *.zip
 span_audit_report.txt
+load/results/*
+!load/results/.gitkeep

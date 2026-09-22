@@ -3,11 +3,12 @@
 // Сценарий выбирается переменной окружения SCENARIO: checker (по умолчанию), rps1000, rps2000.
 // Запуск:
 //   k6 run load/k6_process.js
+//   k6 run -e SCENARIO=smoke load/k6_process.js
 //   k6 run -e SCENARIO=rps1000 load/k6_process.js
 //   k6 run -e SCENARIO=rps2000 load/k6_process.js
 import http from "k6/http";
 import { check, sleep } from "k6";
-import exec from "k6/execution";
+import { Rate, Counter, Trend } from "k6/metrics";
 import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.2/index.js";
 
 const BASE_URL = __ENV.BASE_URL || "http://51.250.4.227";
@@ -53,34 +54,48 @@ function pickText() {
   return LONG_TEXT;
 }
 
-export const options = {
-  scenarios: {
-    checker: {
-      executor: "ramping-vus",
-      stages: [
-        { duration: "30s", target: 50 },
-        { duration: "60s", target: 200 },
-        { duration: "120s", target: 200 },
-        { duration: "30s", target: 0 },
-      ],
-    },
-    rps1000: {
-      executor: "constant-arrival-rate",
-      rate: 500,
-      timeUnit: "1s",
-      duration: "60s",
-      preAllocatedVUs: 300,
-      maxVUs: 1000,
-    },
-    rps2000: {
-      executor: "constant-arrival-rate",
-      rate: 1000,
-      timeUnit: "1s",
-      duration: "60s",
-      preAllocatedVUs: 300,
-      maxVUs: 1000,
-    },
+// Описания всех сценариев. В options попадает только выбранный через SCENARIO.
+const ALL_SCENARIOS = {
+  smoke: {
+    executor: "constant-vus",
+    vus: 5,
+    duration: "10s",
   },
+  checker: {
+    executor: "ramping-vus",
+    stages: [
+      { duration: "30s", target: 50 },
+      { duration: "60s", target: 200 },
+      { duration: "120s", target: 200 },
+      { duration: "30s", target: 0 },
+    ],
+  },
+  rps1000: {
+    executor: "constant-arrival-rate",
+    rate: 500,
+    timeUnit: "1s",
+    duration: "60s",
+    preAllocatedVUs: 300,
+    maxVUs: 1000,
+  },
+  rps2000: {
+    executor: "constant-arrival-rate",
+    rate: 1000,
+    timeUnit: "1s",
+    duration: "60s",
+    preAllocatedVUs: 300,
+    maxVUs: 1000,
+  },
+};
+
+if (!ALL_SCENARIOS[SCENARIO]) {
+  throw new Error(
+    `Неизвестный SCENARIO "${SCENARIO}". Доступные сценарии: ${Object.keys(ALL_SCENARIOS).join(", ")}.`,
+  );
+}
+
+export const options = {
+  scenarios: { [SCENARIO]: ALL_SCENARIOS[SCENARIO] },
   // 429 не считается ошибкой: проверяющая система ждёт Retry-After и повторяет.
   setResponseCallback: http.expectedStatuses(200, 429),
   summaryTrendStats: ["avg", "min", "med", "p(90)", "p(95)", "p(99)", "max"],
