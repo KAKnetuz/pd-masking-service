@@ -1,16 +1,25 @@
 """Оценка точности маскирования на размеченном наборе (gold).
 
-Вход — CSV разметки (utf-8-sig, разделитель ";"):
-    id;text;trap;expected
-    trap: 1 = ловушка (ПД нет), 0 = есть ПД, пусто = не размечено (пропускается).
-    expected: список "тип::значение" через " || ".
+Вход — CSV разметки (разделитель ";", UTF-8 или cp1251):
+    id;text;mask;trap;expected      (колонка mask — справочная, не используется)
+    trap: 1 = ловушка (ПД нет), 0 = есть ПД, пусто = не размечено (строка пропускается).
+    expected: значения через " || ", каждое — "тип::значение". Значение — точная подстрока
+    текста, которую нужно замаскировать; составное ПД («серия 4509 номер 123456») —
+    отдельными значениями: "passport::4509 || passport::123456".
 
-Находки получаются тем же путём, что POST /process для system_id по умолчанию
-(DetectionEngine().detect с политикой "default"). Сопоставление значений и метрики —
-по ПРОМТ 26, часть 2.1.
+Если рядом с CSV лежит файл <имя>.texts.jsonl (его пишет make_gold_template), тексты берутся
+из него по id: Excel при сохранении портит числа и строки, начинающиеся с "+", "=", "-".
+
+Классы значения:
+    TP          — все символы значения (кроме пробелов) замаскированы сущностью того же типа;
+    WRONG_TYPE  — замаскировано полностью, но тип другой;
+    PARTIAL     — замаскирована часть символов;
+    FN          — не замаскировано ничего;
+    NOT_IN_TEXT — значения нет в тексте (ошибка разметки, в метрики не входит).
+FP — замаскированный спан, не пересекающийся ни с одним ожидаемым значением (включая ловушки).
 
 Запуск:
-    python -m scripts.eval_gold --gold <файл.csv> --out <ошибки.csv> [--repo <каталог>]
+    python -m scripts.eval_gold --gold <gold.csv> --out <errors.csv> [--repo <каталог другой версии>]
 """
 
 from __future__ import annotations
@@ -21,30 +30,32 @@ import json
 import os
 import subprocess
 import sys
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from scripts._eval_common import (
-    assert_outside_repo,
-    find_entities,
-    load_default_policy,
-)
+from scripts._eval_common import Finding, assert_outside_repo, find_entities, load_default_policy, read_csv_rows
 
-# Подпроцесс для другой версии кода (--repo): находки в JSON через stdout, только спаны и типы.
+CLASSES = ("TP", "WRONG_TYPE", "PARTIAL", "FN")
+NOT_IN_TEXT = "NOT_IN_TEXT"
+FP_VALUE = "FP_VALUE"
+TRAP_FP = "TRAP_FP"
+
+# Находки другой версии кода (--repo) считаются в отдельном процессе, чтобы модули app
+# двух версий не смешались. Наружу уходят только типы и спаны.
 _REPO_FINDER = r"""
 import json, sys
 from pathlib import Path
 from app.core.engine import DetectionEngine
 from app.core.policy import load_policies
-repo = Path.cwd()
-policy = load_policies(repo / "config" / "systems.yaml").resolve(None)
+policy = load_policies(Path.cwd() / "config" / "systems.yaml").resolve(None)
 engine = DetectionEngine()
-data = json.load(sys.stdin)
-out = {}
-for idx, text in enumerate(data["texts"]):
+texts = json.load(sys.stdin)
+out = []
+for text in texts:
     ents = engine.detect(text, policy.pd_types, policy.combinations)
-    out[idx] = [(e.pd_type.value, list(e.parts)) for e in ents]
-json.dump(out, sys.stdout, ensure_ascii=False)
+    out.append([(e.pd_type.value, [list(p) for p in e.parts]) for e in ents])
+json.dump(out, sys.stdout)
 """
 
 
@@ -65,17 +76,40 @@ class Metrics:
     pd_texts: int = 0
     fn_text: int = 0
     perfect_text: int = 0
-    tp: int = 0
-    partial: int = 0
-    fn: int = 0
-    wrong_type: int = 0
+    classes: Counter[str] = field(default_factory=Counter)
+    not_in_text: int = 0
     fp: int = 0
-    precision: float = 0.0
-    recall: float = 0.0
-    recall_no_type: float = 0.0
-    recall_chars: float = 0.0
-    overmask_chars: float = 0.0
-    type_breakdown: dict[str, tuple[int, int, int]] = field(default_factory=dict)
+    expected_chars: int = 0
+    expected_masked: int = 0
+    masked_chars: int = 0
+    overmask: int = 0
+    by_type: dict[str, Counter[str]] = field(default_factory=dict)
+
+    @property
+    def values(self) -> int:
+        return sum(self.classes[c] for c in CLASSES)
+
+    @property
+    def precision(self) -> float:
+        tp = self.classes["TP"] + self.classes["WRONG_TYPE"]
+        return tp / (tp + self.fp) if tp + self.fp else 0.0
+
+    @property
+    def recall(self) -> float:
+        return self.classes["TP"] / self.values if self.values else 0.0
+
+    @property
+    def recall_any_type(self) -> float:
+        tp = self.classes["TP"] + self.classes["WRONG_TYPE"]
+        return tp / self.values if self.values else 0.0
+
+    @property
+    def recall_chars(self) -> float:
+        return self.expected_masked / self.expected_chars if self.expected_chars else 0.0
+
+    @property
+    def overmask_chars(self) -> float:
+        return self.overmask / self.masked_chars if self.masked_chars else 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,323 +122,296 @@ class ErrorRow:
     text: str
 
 
-Findings = dict[str, list[tuple[str, list[tuple[int, int]]]]]
+# --- разбор разметки ----------------------------------------------------------
 
 
-def parse_gold_row(row: dict[str, str]) -> GoldRow:
-    """Разбирает одну строку CSV разметки в GoldRow."""
-    trap_raw = str(row.get("trap", "")).strip()
-    trap = None if trap_raw == "" else (1 if trap_raw == "1" else 0)
-    expected: list[tuple[str, str]] = []
-    for item in str(row.get("expected", "")).split("||"):
-        item = item.strip()
-        if not item:
-            continue
-        pd_type, _, value = item.partition("::")
-        expected.append((pd_type.strip(), value.strip()))
+def parse_expected(raw: str) -> tuple[tuple[str, str], ...]:
+    """"тип::значение || тип::значение" → ((тип, значение), ...). Пробелы по краям значения не значимы."""
+    items: list[tuple[str, str]] = []
+    for item in raw.split("||"):
+        pd_type, sep, value = item.strip().partition("::")
+        if sep and value.strip():
+            items.append((pd_type.strip(), value.strip()))
+    return tuple(items)
+
+
+def parse_trap(raw: str) -> int | None:
+    value = raw.strip()
+    if value == "":
+        return None
+    return 1 if value == "1" else 0
+
+
+def parse_gold_row(row: dict[str, str], texts_by_id: dict[str, str] | None = None) -> GoldRow:
+    """Одна строка CSV → GoldRow. Текст берётся из texts_by_id, если он там есть."""
+    row_id = str(row.get("id") or "").strip()
+    text = str(row.get("text") or "")
+    if texts_by_id and row_id in texts_by_id:
+        text = texts_by_id[row_id]
     return GoldRow(
-        id=str(row.get("id", "")).strip(),
-        text=str(row.get("text", "")),
-        trap=trap,
-        expected=tuple(expected),
+        id=row_id,
+        text=text,
+        trap=parse_trap(str(row.get("trap") or "")),
+        expected=parse_expected(str(row.get("expected") or "")),
     )
 
 
-def _non_space_positions(text: str, start: int, end: int) -> list[int]:
-    return [i for i in range(start, end) if not text[i].isspace()]
+# --- сопоставление -------------------------------------------------------------
 
 
-def match_value(
-    text: str, value: str, expected_type: str, entities: list[tuple[str, list[tuple[int, int]]]]
-) -> tuple[float, bool]:
-    """Покрытие значения спанами: (доля не-пробельных символов, совпал ли тип).
-
-    Значение ищется по всем вхождениям в text; берётся лучшее покрытие.
-    """
-    best_coverage = 0.0
-    best_type_ok = False
-    start = 0
-    while True:
-        idx = text.find(value, start)
-        if idx == -1:
-            break
-        occ_end = idx + len(value)
-        positions = _non_space_positions(text, idx, occ_end)
-        if positions:
-            covered = 0
-            covering_type: str | None = None
-            for pos in positions:
-                for etype, spans in entities:
-                    if any(s <= pos < e for s, e in spans):
-                        covered += 1
-                        covering_type = etype
-                        break
-            coverage = covered / len(positions)
-            if coverage > best_coverage:
-                best_coverage = coverage
-                best_type_ok = coverage == 1.0 and covering_type == expected_type
-        start = idx + 1
-    return best_coverage, best_type_ok
+def occurrences(text: str, value: str) -> list[tuple[int, int]]:
+    """Все вхождения value в text (с перекрытием)."""
+    found: list[tuple[int, int]] = []
+    start = text.find(value)
+    while value and start != -1:
+        found.append((start, start + len(value)))
+        start = text.find(value, start + 1)
+    return found
 
 
-def classify_value(text: str, value: str, expected_type: str, entities: list[tuple[str, list[tuple[int, int]]]]) -> str:
-    """Классификация значения: TP / PARTIAL / FN / WRONG_TYPE."""
-    coverage, type_ok = match_value(text, value, expected_type, entities)
-    if coverage == 0.0:
+def _type_at(pos: int, findings: list[Finding]) -> str | None:
+    for pd_type, spans in findings:
+        if any(s <= pos < e for s, e in spans):
+            return pd_type
+    return None
+
+
+def _coverage(text: str, start: int, end: int, findings: list[Finding]) -> tuple[float, set[str]]:
+    positions = [i for i in range(start, end) if not text[i].isspace()]
+    types = [_type_at(i, findings) for i in positions]
+    covered = [t for t in types if t is not None]
+    share = len(covered) / len(positions) if positions else 0.0
+    return share, set(covered)
+
+
+def match_value(text: str, value: str, expected_type: str, findings: list[Finding]) -> tuple[float, bool]:
+    """Лучшее покрытие значения по всем вхождениям: (доля символов без пробелов, тип совпал)."""
+    best = (0.0, False)
+    for start, end in occurrences(text, value):
+        share, types = _coverage(text, start, end, findings)
+        type_ok = share == 1.0 and types == {expected_type}
+        if (share, type_ok) > best:
+            best = (share, type_ok)
+    return best
+
+
+def classify_value(text: str, value: str, expected_type: str, findings: list[Finding]) -> str:
+    """TP / WRONG_TYPE / PARTIAL / FN / NOT_IN_TEXT."""
+    if not occurrences(text, value):
+        return NOT_IN_TEXT
+    share, type_ok = match_value(text, value, expected_type, findings)
+    if share == 0.0:
         return "FN"
-    if coverage < 1.0:
+    if share < 1.0:
         return "PARTIAL"
     return "TP" if type_ok else "WRONG_TYPE"
 
 
-def _expected_occurrences(text: str, expected: tuple[tuple[str, str], ...]) -> list[tuple[int, int]]:
-    occurrences: list[tuple[int, int]] = []
-    for _, value in expected:
-        start = 0
-        while True:
-            idx = text.find(value, start)
-            if idx == -1:
-                break
-            occurrences.append((idx, idx + len(value)))
-            start = idx + 1
-    return occurrences
+def expected_spans(row: GoldRow) -> list[tuple[int, int]]:
+    return [span for _, value in row.expected for span in occurrences(row.text, value)]
 
 
-def _masked_positions(text: str, entities: list[tuple[str, list[tuple[int, int]]]]) -> set[int]:
-    positions: set[int] = set()
-    for _, spans in entities:
-        for s, e in spans:
-            positions.update(i for i in range(s, e) if not text[i].isspace())
-    return positions
+def extra_spans(row: GoldRow, findings: list[Finding]) -> list[tuple[str, tuple[int, int]]]:
+    """Замаскированные спаны, не пересекающиеся ни с одним ожидаемым значением."""
+    wanted = expected_spans(row)
+    return [
+        (pd_type, (s, e))
+        for pd_type, spans in findings
+        for s, e in spans
+        if not any(s < we and ws < e for ws, we in wanted)
+    ]
 
 
-def _expected_positions(text: str, expected: tuple[tuple[str, str], ...]) -> set[int]:
-    positions: set[int] = set()
-    for _, value in expected:
-        start = 0
-        while True:
-            idx = text.find(value, start)
-            if idx == -1:
-                break
-            positions.update(i for i in range(idx, idx + len(value)) if not text[i].isspace())
-            start = idx + 1
-    return positions
+# --- метрики -------------------------------------------------------------------
 
 
-def _count_text_metrics(m: Metrics, rows: list[GoldRow], findings: Findings) -> None:
-    m.labeled = sum(1 for r in rows if r.trap is not None)
-    m.skipped = sum(1 for r in rows if r.trap is None)
-    traps = [r for r in rows if r.trap == 1]
-    m.traps = len(traps)
-    m.pd_texts = sum(1 for r in rows if r.trap == 0)
-    m.trap_fp = sum(1 for r in traps if findings.get(r.text))
+def _non_space(text: str, spans: list[tuple[int, int]]) -> set[int]:
+    return {i for s, e in spans for i in range(s, e) if not text[i].isspace()}
 
 
-def _bump_type_breakdown(m: Metrics, etype: str, cls: str) -> None:
-    bd = m.type_breakdown.setdefault(etype, [0, 0, 0])
-    if cls == "TP":
-        bd[0] += 1
-    elif cls == "PARTIAL":
-        bd[1] += 1
-    else:
-        bd[2] += 1
+def _count_chars(m: Metrics, row: GoldRow, findings: list[Finding]) -> None:
+    masked = _non_space(row.text, [span for _, spans in findings for span in spans])
+    wanted = _non_space(row.text, expected_spans(row))
+    m.expected_chars += len(wanted)
+    m.expected_masked += len(wanted & masked)
+    m.masked_chars += len(masked)
+    m.overmask += len(masked - wanted)
 
 
-def _count_value(
-    m: Metrics, text: str, etype: str, value: str, entities: list[tuple[str, list[tuple[int, int]]]]
-) -> str:
-    cls = classify_value(text, value, etype, entities)
-    if cls == "TP":
-        m.tp += 1
-    elif cls == "PARTIAL":
-        m.partial += 1
-    elif cls == "WRONG_TYPE":
-        m.wrong_type += 1
-    else:
-        m.fn += 1
-    _bump_type_breakdown(m, etype, cls)
-    return cls
-
-
-def _count_value_metrics(m: Metrics, rows: list[GoldRow], findings: Findings) -> None:
-    for r in rows:
-        if r.trap != 0:
+def _count_values(m: Metrics, row: GoldRow, findings: list[Finding]) -> None:
+    classes = []
+    for pd_type, value in row.expected:
+        cls = classify_value(row.text, value, pd_type, findings)
+        if cls == NOT_IN_TEXT:
+            m.not_in_text += 1
             continue
-        entities = findings.get(r.text, [])
-        occurrences = _expected_occurrences(r.text, r.expected)
-        row_any_found = False
-        row_all_tp = True
-        for etype, value in r.expected:
-            cls = _count_value(m, r.text, etype, value, entities)
-            row_any_found = row_any_found or cls != "FN"
-            row_all_tp = row_all_tp and cls == "TP"
-        if not row_any_found:
-            m.fn_text += 1
-        if row_all_tp and r.expected:
-            m.perfect_text += 1
-        for _, spans in entities:
-            for s, e in spans:
-                if not any(s < oe and os < e for os, oe in occurrences):
-                    m.fp += 1
+        classes.append(cls)
+        m.classes[cls] += 1
+        m.by_type.setdefault(pd_type, Counter())[cls] += 1
+    if classes and all(c == "FN" for c in classes):
+        m.fn_text += 1
+    if classes and all(c == "TP" for c in classes):
+        m.perfect_text += 1
 
 
-def _count_char_metrics(m: Metrics, rows: list[GoldRow], findings: Findings) -> None:
-    expected_chars = 0
-    expected_masked = 0
-    masked_chars = 0
-    overmask = 0
-    for r in rows:
-        if r.trap != 0:
-            continue
-        entities = findings.get(r.text, [])
-        masked = _masked_positions(r.text, entities)
-        expected_pos = _expected_positions(r.text, r.expected)
-        expected_chars += len(expected_pos)
-        expected_masked += len(expected_pos & masked)
-        masked_chars += len(masked)
-        overmask += len(masked - expected_pos)
-    m.recall_chars = expected_masked / expected_chars if expected_chars else 0.0
-    m.overmask_chars = overmask / masked_chars if masked_chars else 0.0
+def _count_row(m: Metrics, row: GoldRow, findings: list[Finding]) -> None:
+    m.fp += len(extra_spans(row, findings))
+    _count_chars(m, row, findings)
+    if row.trap == 1:
+        m.traps += 1
+        m.trap_fp += 1 if findings else 0
+        return
+    m.pd_texts += 1
+    _count_values(m, row, findings)
 
 
-def _finalize_metrics(m: Metrics) -> None:
-    denom = m.tp + m.partial + m.fn
-    m.precision = m.tp / (m.tp + m.fp) if (m.tp + m.fp) else 0.0
-    m.recall = m.tp / denom if denom else 0.0
-    tp_no_type = m.tp + m.wrong_type
-    m.recall_no_type = tp_no_type / (tp_no_type + m.partial + m.fn) if (tp_no_type + m.partial + m.fn) else 0.0
-
-
-def compute_metrics(rows: list[GoldRow], findings_by_text: Findings) -> Metrics:
-    """Считает метрики по размеченным строкам и находкам."""
+def compute_metrics(rows: list[GoldRow], findings_by_id: dict[str, list[Finding]]) -> Metrics:
+    """Метрики по размеченным строкам. findings_by_id: id строки → находки."""
     m = Metrics()
-    _count_text_metrics(m, rows, findings_by_text)
-    _count_value_metrics(m, rows, findings_by_text)
-    _count_char_metrics(m, rows, findings_by_text)
-    _finalize_metrics(m)
+    for row in rows:
+        if row.trap is None:
+            m.skipped += 1
+            continue
+        m.labeled += 1
+        _count_row(m, row, findings_by_id.get(row.id, []))
     return m
 
 
-def _trap_errors(r: GoldRow, entities: list[tuple[str, list[tuple[int, int]]]]) -> list[ErrorRow]:
-    errors: list[ErrorRow] = []
-    for etype, spans in entities:
-        for s, e in spans:
-            errors.append(ErrorRow(r.id, "TRAP_FP", etype, "", r.text[s:e], r.text))
-    return errors
+# --- список ошибок -------------------------------------------------------------
 
 
-def _value_errors(r: GoldRow, entities: list[tuple[str, list[tuple[int, int]]]]) -> list[ErrorRow]:
-    errors: list[ErrorRow] = []
-    for etype, value in r.expected:
-        cls = classify_value(r.text, value, etype, entities)
-        if cls == "FN":
-            errors.append(ErrorRow(r.id, "FN_VALUE", etype, value, "", r.text))
-        elif cls == "PARTIAL":
-            errors.append(ErrorRow(r.id, "PARTIAL", etype, value, "", r.text))
-        elif cls == "WRONG_TYPE":
-            errors.append(ErrorRow(r.id, "WRONG_TYPE", etype, value, _span_text(r.text, entities, value), r.text))
-    return errors
-
-
-def _fp_errors(
-    r: GoldRow, entities: list[tuple[str, list[tuple[int, int]]]], occurrences: list[tuple[int, int]]
-) -> list[ErrorRow]:
-    errors: list[ErrorRow] = []
-    for etype, spans in entities:
-        for s, e in spans:
-            if not any(s < oe and os < e for os, oe in occurrences):
-                errors.append(ErrorRow(r.id, "FP_VALUE", etype, "", r.text[s:e], r.text))
-    return errors
-
-
-def collect_errors(rows: list[GoldRow], findings_by_text: Findings) -> list[ErrorRow]:
-    """Список ошибок для CSV: FN_VALUE, PARTIAL, FP_VALUE, TRAP_FP, WRONG_TYPE."""
-    errors: list[ErrorRow] = []
-    for r in rows:
-        entities = findings_by_text.get(r.text, [])
-        if r.trap == 1:
-            errors.extend(_trap_errors(r, entities))
-            continue
-        if r.trap is None:
-            continue
-        errors.extend(_value_errors(r, entities))
-        errors.extend(_fp_errors(r, entities, _expected_occurrences(r.text, r.expected)))
-    return errors
-
-
-def _span_text(text: str, entities: list[tuple[str, list[tuple[int, int]]]], value: str) -> str:
-    """Текст спана, покрывающего значение (для WRONG_TYPE)."""
-    idx = text.find(value)
-    if idx == -1:
+def _found_text(text: str, value: str, findings: list[Finding]) -> str:
+    """Замаскированные фрагменты внутри первого вхождения значения."""
+    spans = occurrences(text, value)
+    if not spans:
         return ""
-    for _, spans in entities:
-        for s, e in spans:
-            if s <= idx < e:
-                return text[s:e]
-    return ""
+    start, end = spans[0]
+    parts = [text[max(s, start) : min(e, end)] for _, sp in findings for s, e in sp if s < end and start < e]
+    return " | ".join(parts)
 
 
-def _load_gold(path: Path) -> list[GoldRow]:
-    with path.open(encoding="utf-8-sig", newline="") as fh:
-        reader = csv.DictReader(fh, delimiter=";")
-        return [parse_gold_row(row) for row in reader]
+def _value_errors(row: GoldRow, findings: list[Finding]) -> list[ErrorRow]:
+    errors = []
+    for pd_type, value in row.expected:
+        cls = classify_value(row.text, value, pd_type, findings)
+        if cls == "TP":
+            continue
+        kind = cls if cls in (NOT_IN_TEXT, "PARTIAL", "WRONG_TYPE") else "FN_VALUE"
+        errors.append(ErrorRow(row.id, kind, pd_type, value, _found_text(row.text, value, findings), row.text))
+    return errors
 
 
-def _current_findings(texts: list[str]) -> dict[str, list[tuple[str, list[tuple[int, int]]]]]:
+def collect_errors(rows: list[GoldRow], findings_by_id: dict[str, list[Finding]]) -> list[ErrorRow]:
+    """Ошибки для CSV: FN_VALUE, PARTIAL, WRONG_TYPE, NOT_IN_TEXT, FP_VALUE, TRAP_FP."""
+    errors: list[ErrorRow] = []
+    for row in rows:
+        if row.trap is None:
+            continue
+        findings = findings_by_id.get(row.id, [])
+        kind = TRAP_FP if row.trap == 1 else FP_VALUE
+        for pd_type, (s, e) in extra_spans(row, findings):
+            errors.append(ErrorRow(row.id, kind, pd_type, "", row.text[s:e], row.text))
+        if row.trap == 0:
+            errors.extend(_value_errors(row, findings))
+    return errors
+
+
+# --- ввод-вывод ------------------------------------------------------------------
+
+
+def _texts_path(gold: Path) -> Path:
+    return gold.with_name(gold.stem + ".texts.jsonl")
+
+
+def load_texts(path: Path) -> dict[str, str]:
+    texts: dict[str, str] = {}
+    if not path.exists():
+        return texts
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            if line.strip():
+                item = json.loads(line)
+                texts[str(item["id"])] = item["text"]
+    return texts
+
+
+def load_gold(path: Path) -> list[GoldRow]:
+    texts = load_texts(_texts_path(path))
+    return [parse_gold_row(row, texts) for row in read_csv_rows(path)]
+
+
+def current_findings(rows: list[GoldRow]) -> dict[str, list[Finding]]:
     policy = load_default_policy()
-    return {text: find_entities(text, policy) for text in texts}
+    return {row.id: find_entities(row.text, policy) for row in rows}
 
 
-def _repo_findings(repo: Path, texts: list[str]) -> dict[str, list[tuple[str, list[tuple[int, int]]]]]:
-    env = dict(os.environ)
-    env["PYTHONPATH"] = str(repo)
+def repo_findings(repo: Path, rows: list[GoldRow]) -> dict[str, list[Finding]]:
+    env = {**os.environ, "PYTHONPATH": str(repo)}
     proc = subprocess.run(
         [sys.executable, "-c", _REPO_FINDER],
         cwd=str(repo),
         env=env,
-        input=json.dumps({"texts": texts}),
+        input=json.dumps([row.text for row in rows]),
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=True,
     )
     raw = json.loads(proc.stdout)
-    return {texts[int(idx)]: [(t, [tuple(sp) for sp in spans]) for t, spans in items] for idx, items in raw.items()}
+    return {
+        row.id: [(t, [(s, e) for s, e in spans]) for t, spans in items] for row, items in zip(rows, raw, strict=True)
+    }
 
 
-def _print_metrics(m: Metrics) -> None:
-    print("labeled;skipped")
-    print(f"{m.labeled};{m.skipped}")
-    print("traps;trap_fp")
-    print(f"{m.traps};{m.trap_fp}")
-    print("pd_texts;fn_text;perfect_text")
-    print(f"{m.pd_texts};{m.fn_text};{m.perfect_text}")
-    print("tp;partial;fn;wrong_type;fp")
-    print(f"{m.tp};{m.partial};{m.fn};{m.wrong_type};{m.fp}")
-    print("precision;recall;recall_no_type")
-    print(f"{m.precision:.4f};{m.recall:.4f};{m.recall_no_type:.4f}")
-    print("recall_chars;overmask_chars")
-    print(f"{m.recall_chars:.4f};{m.overmask_chars:.4f}")
-    print("type;tp;partial;fn")
-    for pd_type in sorted(m.type_breakdown):
-        tp, partial, fn = m.type_breakdown[pd_type]
-        print(f"{pd_type};{tp};{partial};{fn}")
+def _summary(m: Metrics) -> list[tuple[str, str]]:
+    return [
+        ("labeled", str(m.labeled)),
+        ("skipped (trap пусто)", str(m.skipped)),
+        ("traps", str(m.traps)),
+        ("trap_fp (ловушки с находкой)", str(m.trap_fp)),
+        ("pd_texts", str(m.pd_texts)),
+        ("fn_text (ничего не найдено)", str(m.fn_text)),
+        ("perfect_text (всё TP)", str(m.perfect_text)),
+        *((f"values {c}", str(m.classes[c])) for c in CLASSES),
+        ("not_in_text (ошибки разметки)", str(m.not_in_text)),
+        ("fp spans", str(m.fp)),
+        ("precision", f"{m.precision:.4f}"),
+        ("recall", f"{m.recall:.4f}"),
+        ("recall_any_type", f"{m.recall_any_type:.4f}"),
+        ("recall_chars", f"{m.recall_chars:.4f}"),
+        ("overmask_chars", f"{m.overmask_chars:.4f}"),
+    ]
 
 
-def _write_errors(path: Path, errors: list[ErrorRow]) -> None:
+def _type_lines(m: Metrics) -> list[str]:
+    lines = ["type;TP;WRONG_TYPE;PARTIAL;FN"]
+    for pd_type in sorted(m.by_type):
+        counts = m.by_type[pd_type]
+        lines.append(";".join([pd_type, *(str(counts[c]) for c in CLASSES)]))
+    return lines
+
+
+def print_report(after: Metrics, before: Metrics | None = None) -> None:
+    if before is None:
+        print("metric;value")
+        for name, value in _summary(after):
+            print(f"{name};{value}")
+    else:
+        print("metric;before;after")
+        for (name, old), (_, new) in zip(_summary(before), _summary(after), strict=True):
+            print(f"{name};{old};{new}")
+        print("--- before ---")
+        print("\n".join(_type_lines(before)))
+        print("--- after ---")
+    print("\n".join(_type_lines(after)))
+
+
+def write_errors(path: Path, errors: list[ErrorRow]) -> None:
     with path.open("w", encoding="utf-8-sig", newline="") as fh:
         writer = csv.writer(fh, delimiter=";")
         writer.writerow(["id", "kind", "type", "expected", "found", "text"])
         for err in errors:
             writer.writerow([err.id, err.kind, err.pd_type, err.expected, err.found, err.text])
-
-
-def _print_side_by_side(before: Metrics, after: Metrics) -> None:
-    print("metric;before;after")
-    for name in ("labeled", "skipped", "traps", "trap_fp", "pd_texts", "fn_text", "perfect_text",
-                 "tp", "partial", "fn", "wrong_type", "fp"):
-        print(f"{name};{getattr(before, name)};{getattr(after, name)}")
-    for name in ("precision", "recall", "recall_no_type", "recall_chars", "overmask_chars"):
-        print(f"{name};{getattr(before, name):.4f};{getattr(after, name):.4f}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -414,20 +421,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", type=Path, default=None, help="корень другой версии кода (git worktree)")
     args = parser.parse_args(argv)
 
-    assert_outside_repo(args.out)
     assert_outside_repo(args.gold)
-    rows = _load_gold(args.gold)
-    texts = [r.text for r in rows]
-
-    after = compute_metrics(rows, _current_findings(texts))
-    errors = collect_errors(rows, _current_findings(texts))
-    _write_errors(args.out, errors)
-
-    if args.repo is not None:
-        before = compute_metrics(rows, _repo_findings(args.repo, texts))
-        _print_side_by_side(before, after)
-    else:
-        _print_metrics(after)
+    assert_outside_repo(args.out)
+    rows = load_gold(args.gold)
+    findings = current_findings(rows)
+    after = compute_metrics(rows, findings)
+    write_errors(args.out, collect_errors(rows, findings))
+    before = compute_metrics(rows, repo_findings(args.repo, rows)) if args.repo else None
+    print_report(after, before)
     return 0
 
 
