@@ -14,6 +14,11 @@ import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.2/index.js";
 const BASE_URL = __ENV.BASE_URL || "http://51.250.4.227";
 const SCENARIO = __ENV.SCENARIO || "checker";
 
+// Share of long texts in the mix (0..1). Complex share stays fixed at 0.35,
+// the rest are short phrases. Set LONG_SHARE=0 to disable long texts entirely.
+const LONG_SHARE = Number(__ENV.LONG_SHARE || 0.05);
+const COMPLEX_SHARE = 0.35;
+
 // Texts are loaded from an ASCII-only JSON produced by scripts/export_load_texts.py.
 const TEXTS = JSON.parse(open("./texts.json"));
 
@@ -27,16 +32,16 @@ function buildLongText() {
 }
 const LONG_TEXT = buildLongText();
 
-// Text selection: 60% short phrases, 35% complex sample, 5% long text.
+// Text selection: COMPLEX_SHARE complex samples, LONG_SHARE long texts, rest short phrases.
 function pickText() {
   const r = Math.random();
-  if (r < 0.6) {
-    return TEXTS.short[Math.floor(Math.random() * TEXTS.short.length)];
-  }
-  if (r < 0.95) {
+  if (r < COMPLEX_SHARE) {
     return TEXTS.complex;
   }
-  return { text: LONG_TEXT, has_pd: true };
+  if (LONG_SHARE > 0 && r < COMPLEX_SHARE + LONG_SHARE) {
+    return { text: LONG_TEXT, has_pd: true };
+  }
+  return TEXTS.short[Math.floor(Math.random() * TEXTS.short.length)];
 }
 
 // Descriptions of all scenarios. Only the one selected via SCENARIO goes into options.
