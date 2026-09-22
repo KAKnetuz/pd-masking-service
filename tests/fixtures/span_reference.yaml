@@ -488,3 +488,400 @@
   title: Нейтральная фраза 7
   text: "Оформила вклад, подписала договор, получила карту."
   expected: []
+
+# --- Голые значения (весь текст = одно значение) ---------------------------
+- id: 66
+  title: Голый PIN
+  text: "1234"
+  expected:
+    - type: pin
+      parts: ["1234"]
+
+- id: 67
+  title: Голый CVV
+  text: "123"
+  expected:
+    - type: cvv
+      parts: ["123"]
+
+- id: 68
+  title: Голый срок карты ММ/ГГ
+  text: "12/27"
+  expected:
+    - type: card_expiry
+      parts: ["12/27"]
+
+- id: 69
+  title: Голый срок карты ММ/ГГГГ
+  text: "12/2027"
+  expected:
+    - type: card_expiry
+      parts: ["12/2027"]
+
+- id: 70
+  title: Голая дата дд.мм.гггг
+  text: "01.01.1990"
+  expected:
+    - type: date
+      parts: ["01.01.1990"]
+
+- id: 71
+  title: Голая дата ISO
+  text: "1990-01-15"
+  expected:
+    - type: date
+      parts: ["1990-01-15"]
+
+- id: 72
+  title: Голая дата текстом
+  text: "15 марта 1990"
+  expected:
+    - type: date
+      parts: ["15 марта 1990"]
+
+- id: 73
+  title: Голый паспорт с пробелом
+  text: "4509 123456"
+  expected:
+    - type: passport
+      parts: ["4509", "123456"]
+
+- id: 74
+  title: Голый паспорт серия с пробелом
+  text: "45 09 123456"
+  expected:
+    - type: passport
+      parts: ["45 09", "123456"]
+
+- id: 75
+  title: Голый паспорт без пробелов
+  text: "4509123456"
+  expected:
+    - type: passport
+      parts: ["4509123456"]
+
+- id: 76
+  title: Голый паспорт серия 99
+  text: "99 00 123456"
+  expected:
+    - type: passport
+      parts: ["99 00", "123456"]
+
+- id: 77
+  title: Голое ВУ с буквами
+  text: "77 АА 123456"
+  expected:
+    - type: driver_license
+      parts: ["77 АА 123456"]
+
+- id: 78
+  title: Голый код подразделения
+  text: "230-005"
+  expected:
+    - type: department_code
+      parts: ["230-005"]
+
+- id: 79
+  title: Голый индекс
+  text: "350000"
+  expected:
+    - type: address
+      parts: ["350000"]
+
+- id: 80
+  title: Голый ИНН 12 цифр
+  text: "123456789012"
+  expected:
+    - type: inn
+      parts: ["123456789012"]
+
+- id: 81
+  title: Голый ИНН 10 цифр
+  text: "1234567890"
+  expected:
+    - type: passport
+      parts: ["1234567890"]
+
+- id: 82
+  title: Голая карта с пробелами
+  text: "1234 5678 9012 3456"
+  expected:
+    - type: card_number
+      parts: ["1234 5678 9012 3456"]
+
+- id: 83
+  title: Голая карта без пробелов
+  text: "1234567890123456"
+  expected:
+    - type: card_number
+      parts: ["1234567890123456"]
+
+- id: 84
+  title: Голый телефон +7
+  text: "+79161234567"
+  expected:
+    - type: phone
+      parts: ["+79161234567"]
+
+- id: 85
+  title: Голый телефон 8
+  text: "8 916 123 45 67"
+  expected:
+    - type: phone
+      parts: ["8 916 123 45 67"]
+
+- id: 86
+  title: Голый email
+  text: "ivan.petrov@mail.ru"
+  expected:
+    - type: email
+      parts: ["ivan.petrov@mail.ru"]
+
+- id: 87
+  title: Голое ФИО
+  text: "Иванов Иван Иванович"
+  expected:
+    - type: fio
+      parts: ["Иванов Иван Иванович"]
+
+- id: 88
+  title: Голый держатель карты
+  text: "IVAN IVANOV"
+  expected:
+    - type: card_holder
+      parts: ["IVAN IVANOV"]
+
+- id: 89
+  title: Голое гражданство Россия
+  text: "Россия"
+  expected:
+    - type: citizenship
+      parts: ["Россия"]
+
+- id: 90
+  title: Голое гражданство Украина
+  text: "Украина"
+  expected:
+    - type: citizenship
+      parts: ["Украина"]
+
+- id: 91
+  title: Голое гражданство РФ
+  text: "Российская Федерация"
+  expected:
+    - type: citizenship
+      parts: ["Российская Федерация"]
+
+- id: 92
+  title: Голый орган выдачи ГУ МВД
+  text: "ГУ МВД России по г. Москве"
+  expected:
+    - type: passport_issuer
+      parts: ["ГУ МВД России по г. Москве"]
+
+- id: 93
+  title: Голый орган выдачи ОУФМС
+  text: "ОУФМС России по Краснодарскому краю"
+  expected:
+    - type: passport_issuer
+      parts: ["ОУФМС России по Краснодарскому краю"]
+
+# --- С метками (неверные контрольные суммы, разные формы) ------------------
+- id: 94
+  title: Срок действия с меткой
+  text: "Срок действия: 12/27"
+  expected:
+    - type: card_expiry
+      parts: ["12/27"]
+
+- id: 95
+  title: Действует до
+  text: "Действует до 05/28"
+  expected:
+    - type: card_expiry
+      parts: ["05/28"]
+
+- id: 96
+  title: Срок действия карты ММ.ГГГГ
+  text: "Срок действия карты 12.2027"
+  expected:
+    - type: card_expiry
+      parts: ["12.2027"]
+
+- id: 97
+  title: CVV с меткой
+  text: "CVV: 123"
+  expected:
+    - type: cvv
+      parts: ["123"]
+
+- id: 98
+  title: CVC2 с меткой
+  text: "CVC2 123"
+  expected:
+    - type: cvv
+      parts: ["123"]
+
+- id: 99
+  title: Код безопасности
+  text: "код безопасности 123"
+  expected:
+    - type: cvv
+      parts: ["123"]
+
+- id: 100
+  title: ПИН-код с меткой
+  text: "ПИН-код 1234"
+  expected:
+    - type: pin
+      parts: ["1234"]
+
+- id: 101
+  title: PIN с меткой
+  text: "PIN: 1234"
+  expected:
+    - type: pin
+      parts: ["1234"]
+
+- id: 102
+  title: ИНН с меткой неверная сумма
+  text: "ИНН 123456789012"
+  expected:
+    - type: inn
+      parts: ["123456789012"]
+
+- id: 103
+  title: Номер карты с меткой неверная сумма
+  text: "Номер карты 1234 5678 9012 3456"
+  expected:
+    - type: card_number
+      parts: ["1234 5678 9012 3456"]
+
+- id: 104
+  title: Гражданство с двоеточием
+  text: "Гражданство: Россия"
+  expected:
+    - type: citizenship
+      parts: ["Россия"]
+
+- id: 105
+  title: Гражданка России
+  text: "Гражданка России"
+  expected:
+    - type: citizenship
+      parts: ["России"]
+
+- id: 106
+  title: Гражданин Республики Казахстан
+  text: "гражданин Республики Казахстан"
+  expected:
+    - type: citizenship
+      parts: ["Республики Казахстан"]
+
+- id: 107
+  title: Дата выдачи с меткой
+  text: "Дата выдачи: 01.02.2015"
+  expected:
+    - type: passport_issue_date
+      parts: ["01.02.2015"]
+
+- id: 108
+  title: Выдан ОВД района
+  text: "Выдан ОВД района Хамовники г. Москвы"
+  expected:
+    - type: passport_issuer
+      parts: ["ОВД района Хамовники г. Москвы"]
+
+- id: 109
+  title: Код подразделения с меткой
+  text: "Код подразделения 770-001"
+  expected:
+    - type: department_code
+      parts: ["770-001"]
+
+- id: 110
+  title: ВУ с меткой
+  text: "Водительское удостоверение 77 АА 123456"
+  expected:
+    - type: driver_license
+      parts: ["77 АА", "123456"]
+
+- id: 111
+  title: Дата рождения с меткой
+  text: "Дата рождения: 5 марта 1990 г."
+  expected:
+    - type: birth_date
+      parts: ["5 марта 1990"]
+
+- id: 112
+  title: Место рождения гор
+  text: "Место рождения: гор. Москва"
+  expected:
+    - type: birth_place
+      parts: ["Москва"]
+
+- id: 113
+  title: Место рождения край станица
+  text: "Место рождения — Краснодарский край, ст. Каневская"
+  expected:
+    - type: birth_place
+      parts: ["Краснодарский край, ст. Каневская"]
+
+- id: 114
+  title: Имя держателя с меткой
+  text: "Имя держателя: IVANOV IVAN"
+  expected:
+    - type: card_holder
+      parts: ["IVANOV IVAN"]
+
+- id: 115
+  title: Держатель с меткой
+  text: "Держатель: Ivan Petrov"
+  expected:
+    - type: card_holder
+      parts: ["Ivan Petrov"]
+
+- id: 116
+  title: Телефон с меткой
+  text: "тел. 8(861)234-56-78"
+  expected:
+    - type: phone
+      parts: ["8(861)234-56-78"]
+
+- id: 117
+  title: Email с меткой
+  text: "e-mail: a.b-c_d@sub.domain.ru"
+  expected:
+    - type: email
+      parts: ["a.b-c_d@sub.domain.ru"]
+
+# --- Ловушки — ничего не найдено -------------------------------------------
+- id: 118
+  title: Ловушка Пушкин голый
+  text: "Александр Пушкин"
+  expected: []
+
+- id: 119
+  title: Ловушка Толстой голый
+  text: "Лев Толстой"
+  expected: []
+
+- id: 120
+  title: Ловушка год
+  text: "2024"
+  expected: []
+
+- id: 121
+  title: Ловушка Спасибо
+  text: "Спасибо"
+  expected: []
+
+- id: 122
+  title: Ловушка отделение банка
+  text: "Отделение банка на ул. Ленина, д. 5"
+  expected: []
+
+- id: 123
+  title: Ловушка горячая линия
+  text: "Тел. горячей линии 8 800 100-00-00"
+  expected: []

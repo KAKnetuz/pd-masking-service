@@ -30,9 +30,13 @@ _EXPIRY_CTX_RE = re.compile(
     r"\s*[:\-–.]?\s*" + _EXPIRY_VALUE,
     FLAGS,
 )
-# «действует до 12/27» бывает и у скидки — считаем сроком карты только рядом с номером карты.
+# «действует до 12/27» бывает и у скидки — не считаем сроком карты, если рядом слово скидки/акции.
 _EXPIRY_WEAK_CTX_RE = re.compile(
     r"(?:действительн\w*\s+до|действует\s+до|годна\s+до)\s*[:\-–.]?\s*" + _EXPIRY_VALUE, FLAGS
+)
+_DISCOUNT_CUE_RE = re.compile(
+    r"скидк\w*|акци\w*|предложени\w*|тариф\w*|цена|цены|цен\w*|стоимост\w*|промо|бонус\w*|купон\w*",
+    FLAGS,
 )
 _EXPIRY_BARE_RE = re.compile(r"(?<![\d/.])((?:0[1-9]|1[0-2])/\d{2})(?![\d/])")
 
@@ -83,9 +87,10 @@ class CardDetector(Detector):
         for m in _EXPIRY_CTX_RE.finditer(text):
             yield make_entity(PDType.CARD_EXPIRY, _group(m), priority=80)
         for m in _EXPIRY_WEAK_CTX_RE.finditer(text):
-            yield make_entity(
-                PDType.CARD_EXPIRY, _group(m), priority=78, requires_any=frozenset({PDType.CARD_NUMBER})
-            )
+            # «действует до» у скидки/акции — не срок карты; иначе маскируем без номера карты.
+            if cue_before(text, m.start(), _DISCOUNT_CUE_RE, window=40):
+                continue
+            yield make_entity(PDType.CARD_EXPIRY, _group(m), priority=78)
         for m in _EXPIRY_BARE_RE.finditer(text):
             yield make_entity(
                 PDType.CARD_EXPIRY, _group(m), priority=40, requires_any=frozenset({PDType.CARD_NUMBER})
