@@ -68,6 +68,36 @@ systems:
       phone:       {strategy: synthetic}
       card_number: {strategy: synthetic}
 
+  # Демо-прокси /chat: метки-токены понятны LLM и восстанавливаются в ответе.
+  llm-demo:
+    enabled: true
+    pd_types: all
+    unmask: true
+    masking:
+      fio:                {strategy: token}
+      birth_date:         {strategy: token}
+      birth_place:        {strategy: token}
+      passport:           {strategy: token}
+      citizenship:        {strategy: token}
+      passport_issuer:    {strategy: token}
+      department_code:    {strategy: token}
+      passport_issue_date: {strategy: token}
+      driver_license:     {strategy: token}
+      address:            {strategy: token}
+      email:              {strategy: token}
+      phone:              {strategy: token}
+      inn:                {strategy: token}
+      card_number:        {strategy: token}
+      cvv:                {strategy: token}
+      pin:                {strategy: token}
+      card_holder:        {strategy: token}
+      card_expiry:        {strategy: token}
+      date:               {strategy: token}
+      snils:              {strategy: token}
+      foreign_passport:   {strategy: token}
+      military_id:        {strategy: token}
+      birth_certificate:  {strategy: token}
+
   # Выведенная из эксплуатации система: доступ закрыт.
   legacy-crm:
     enabled: false

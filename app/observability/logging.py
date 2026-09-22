@@ -22,6 +22,7 @@ _ALLOWED_FIELDS = (
     "tokens",
     "pd_types",
     "entities",
+    "llm_ms",
     "operation",
     "error",
     "storage",

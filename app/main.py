@@ -11,13 +11,16 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import Response
 
+from app.api import chat as chat_api
 from app.api import process as process_api
 from app.api import service as service_api
 from app.api.limiter import InflightLimitMiddleware
+from app.core.chat_proxy import ChatProxy
 from app.core.engine import DetectionEngine
 from app.core.masking import Masker
 from app.core.policy import load_policies
 from app.core.processor import Processor
+from app.llm.client import build_llm_client
 from app.observability.logging import setup_logging
 from app.settings import Settings
 from app.storage.base import MappingStore
@@ -52,18 +55,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         codec = RecordCodec(_secret(settings.encryption_key, "ENCRYPTION_KEY"))
         store = build_store(settings, codec)
+        llm_client = build_llm_client(settings)
         app.state.settings = settings
         app.state.policies = load_policies(settings.systems_config)
         app.state.store = store
         app.state.processor = Processor(
             DetectionEngine(), Masker(_secret(settings.token_secret, "TOKEN_SECRET")), store
         )
+        app.state.chat_proxy = ChatProxy(
+            DetectionEngine(), Masker(_secret(settings.token_secret, "TOKEN_SECRET")), llm_client
+        )
         log.info("started", extra={"storage": settings.storage_backend})
         yield
+        await llm_client.aclose()
         await store.close()
 
     app = FastAPI(title="PD Security Module", version="1.0.0", lifespan=lifespan, docs_url="/docs")
     app.include_router(process_api.router)
+    app.include_router(chat_api.router)
     app.include_router(service_api.router)
     app.add_middleware(InflightLimitMiddleware, max_inflight=settings.max_inflight)
 

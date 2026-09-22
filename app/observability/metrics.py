@@ -32,6 +32,12 @@ PD_FOUND = Counter("pd_entities_total", "Найденные сущности П�
 REJECTED = Counter("pd_rejected_total", "Отклонённые запросы", ["reason"])
 STORE_DEGRADED = Counter("pd_store_degraded_total", "Переключения на резервное хранилище")
 INFLIGHT = Gauge("pd_inflight_requests", "Запросы в обработке", multiprocess_mode="livesum")
+LLM_LATENCY = Histogram(
+    "pd_llm_duration_seconds",
+    "Время вызова внешней LLM",
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0),
+)
+LLM_ERRORS = Counter("pd_llm_errors_total", "Ошибки внешней LLM", ["reason"])
 
 
 def estimate_tokens(text: str) -> int:
