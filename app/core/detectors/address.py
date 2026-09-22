@@ -120,6 +120,9 @@ _LOCALITY_RE = re.compile(r"(?-i:[А-ЯЁ][а-яё]+(?:-на-[А-ЯЁ][а-яё]+
 
 _GAP_RE = re.compile(r"[\s,;]{0,4}")
 
+# Инициалы: заглавная буква с точкой перед однобуквенной меткой адреса («А.С.», «А. С.»).
+_INITIALS_RE = re.compile(r"[А-ЯЁ]\.\s?[А-ЯЁ]\.")
+
 # Адрес организации (отделения банка и т.п.) — не персональные данные.
 # Признак организации: любое слово, содержащее «банк», а также «офис», «отделение», «филиал»
 # в том же предложении перед адресом.
@@ -170,6 +173,7 @@ class AddressDetector(Detector):
             return
         components = self._add_localities(text, components)
         components = self._add_bare_house(text, components)
+        components = self._drop_initials_labels(text, components)
         # Признаки организации и границы предложений — один проход, дальше бинарный поиск.
         org_positions = [m.start() for m in _ORG_CUE_RE.finditer(text)]
         sentence_starts = [0] + [m.end() for m in _SENTENCE_START_RE.finditer(text)]
@@ -183,6 +187,18 @@ class AddressDetector(Detector):
                     continue
             for comp in chain:
                 yield make_entity(PDType.ADDRESS, [comp.value], priority=50, subtype=comp.kind)
+
+    @staticmethod
+    def _drop_initials_labels(text: str, components: list[_Component]) -> list[_Component]:
+        """Однобуквенная метка адреса (с., д., г., к., ш.) не считается меткой,
+        если она — часть инициалов: перед ней заглавная буква с точкой («А.С.», «А. С.»)."""
+        if not components:
+            return components
+        # Позиции второй буквы инициалов — там однобуквенная метка не является меткой.
+        initials_positions = {m.start() + len(m.group(0)) - 2 for m in _INITIALS_RE.finditer(text)}
+        if not initials_positions:
+            return components
+        return [comp for comp in components if comp.start not in initials_positions]
 
     @staticmethod
     def _components(text: str) -> list[_Component]:
