@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 from app.core.detectors.base import FLAGS, Detector
 from app.core.detectors.names_data import (
@@ -86,6 +86,108 @@ def _strip(text: str) -> str:
     return text.strip().rstrip(".,;!")
 
 
+# --- Классификация «голого значения»: каждая ветка — отдельная проверка. -----
+# Порядок проверок в _CHECKS совпадает с порядком веток исходного _classify.
+_STOP = object()  # проверка решила: это точно не ПД, дальше не проверять
+
+_Check = Callable[[str], object]
+
+
+def _check_pin(value: str) -> object:
+    # 4 цифры → pin, кроме годов 1900–2099 (год — не ПД).
+    if re.fullmatch(r"\d{4}", value):
+        year = int(value)
+        if not 1900 <= year <= 2099:
+            return PDType.CARD_PIN
+        return _STOP
+    return None
+
+
+def _check_formats(value: str) -> object:
+    for pattern, pd_type in _FORMATS:
+        if pattern.fullmatch(value):
+            return pd_type
+    return None
+
+
+def _check_date(value: str) -> object:
+    date_type = StandaloneValueDetector._classify_date(value)
+    if date_type is not None:
+        return date_type
+    return None
+
+
+def _check_card_number(value: str) -> object:
+    if _CARD_NUMBER_RE.fullmatch(value):
+        digits = "".join(ch for ch in value if ch.isdigit())
+        if 16 <= len(digits) <= 19:
+            return PDType.CARD_NUMBER
+    return None
+
+
+def _check_phone(value: str) -> object:
+    if _PHONE_RE.fullmatch(value):
+        return PDType.PHONE
+    return None
+
+
+def _check_email(value: str) -> object:
+    if _EMAIL_RE.fullmatch(value):
+        return PDType.EMAIL
+    return None
+
+
+def _check_issuer(value: str) -> object:
+    if _ISSUER_RE.fullmatch(value):
+        return PDType.PASSPORT_ISSUER
+    return None
+
+
+def _check_card_holder(value: str) -> object:
+    if _CARD_HOLDER_RE.fullmatch(value):
+        words = value.casefold().split()
+        if not any(w in _LATIN_STOPWORDS for w in words):
+            return PDType.CARD_HOLDER
+    return None
+
+
+def _check_citizenship(value: str) -> object:
+    if value.casefold() in _COUNTRIES:
+        return PDType.CITIZENSHIP
+    return None
+
+
+def _check_single_word(value: str) -> object:
+    # Одиночное слово: имя/фамилия/отчество или город.
+    if " " not in value:
+        return StandaloneValueDetector._classify_single_word(value)
+    return None
+
+
+_CHECKS: tuple[_Check, ...] = (
+    _check_pin,
+    _check_formats,
+    _check_date,
+    _check_card_number,
+    _check_phone,
+    _check_email,
+    _check_issuer,
+    _check_card_holder,
+    _check_citizenship,
+    _check_single_word,
+)
+
+
+def _classify(value: str) -> PDType | None:
+    for check in _CHECKS:
+        result = check(value)
+        if result is _STOP:
+            return None
+        if result is not None:
+            return result
+    return None
+
+
 class StandaloneValueDetector(Detector):
     """«Голое значение»: весь текст — одно значение ПД."""
 
@@ -111,39 +213,7 @@ class StandaloneValueDetector(Detector):
 
     @classmethod
     def _classify(cls, value: str) -> PDType | None:
-        # 4 цифры → pin, кроме годов 1900–2099 (год — не ПД).
-        if re.fullmatch(r"\d{4}", value):
-            year = int(value)
-            if not 1900 <= year <= 2099:
-                return PDType.CARD_PIN
-            return None
-        for pattern, pd_type in _FORMATS:
-            if pattern.fullmatch(value):
-                return pd_type
-        # Даты: год >= 1900.
-        date_type = cls._classify_date(value)
-        if date_type is not None:
-            return date_type
-        if _CARD_NUMBER_RE.fullmatch(value):
-            digits = "".join(ch for ch in value if ch.isdigit())
-            if 16 <= len(digits) <= 19:
-                return PDType.CARD_NUMBER
-        if _PHONE_RE.fullmatch(value):
-            return PDType.PHONE
-        if _EMAIL_RE.fullmatch(value):
-            return PDType.EMAIL
-        if _ISSUER_RE.fullmatch(value):
-            return PDType.PASSPORT_ISSUER
-        if _CARD_HOLDER_RE.fullmatch(value):
-            words = value.casefold().split()
-            if not any(w in _LATIN_STOPWORDS for w in words):
-                return PDType.CARD_HOLDER
-        if value.casefold() in _COUNTRIES:
-            return PDType.CITIZENSHIP
-        # Одиночное слово: имя/фамилия/отчество или город.
-        if " " not in value:
-            return cls._classify_single_word(value)
-        return None
+        return _classify(value)
 
     @staticmethod
     def _classify_date(value: str) -> PDType | None:

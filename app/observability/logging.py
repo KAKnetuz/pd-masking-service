@@ -27,6 +27,7 @@ _ALLOWED_FIELDS = (
     "error",
     "storage",
     "workers",
+    "shape",
 )
 
 

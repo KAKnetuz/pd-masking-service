@@ -15,6 +15,7 @@ from app.api.responses import json_response
 from app.core.policy import SystemNotAllowedError
 from app.core.processor import UnmaskForbiddenError
 from app.observability.metrics import LATENCY, PD_FOUND, REJECTED, REQUESTS, TOKENS, estimate_tokens
+from app.observability.shape import text_shape
 from app.storage.base import StoreUnavailableError
 
 log = logging.getLogger("pd.process")
@@ -78,4 +79,6 @@ async def process(body: ProcessRequest, request: Request) -> Response:
             "pd_types": outcome.pd_types,
         },
     )
+    if settings.debug_shapes and direction == "mask" and not outcome.pd_types:
+        log.info("no_pd_shape", extra={"shape": text_shape(body.payload), "chars": len(body.payload)})
     return json_response({"result": outcome.result})

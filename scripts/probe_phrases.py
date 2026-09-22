@@ -127,23 +127,35 @@ def _fmt_expected(expected: list[tuple[str, list[str]]] | None) -> str:
     return "; ".join(f"{t}: {', '.join(parts)}" for t, parts in expected)
 
 
-def main() -> None:
-    ok = miss = fp = 0
+_OK = "OK"
+
+
+def _run_case(
+    text: str, expected: list[tuple[str, list[str]]] | None
+) -> tuple[str, list[tuple[str, list[str]]]]:
+    found = _found(text)
+    status = (
+        (_OK if not found else "FP") if expected is None else _OK if found == expected else "MISS"
+    )
+    return status, found
+
+
+def _print_table(
+    results: list[tuple[str, list[tuple[str, list[str]]] | None, str, list[tuple[str, list[str]]]]],
+) -> None:
     print(f"{'фраза':<42}{'найдено':<52}{'ожидание':<40}статус")
     print("-" * 150)
-    for text, expected in CASES:
-        found = _found(text)
-        status = (
-            ("OK" if not found else "FP") if expected is None else "OK" if found == expected else "MISS"
-        )
-        if status == "OK":
-            ok += 1
-        elif status == "MISS":
-            miss += 1
-        else:
-            fp += 1
+    for text, expected, status, found in results:
         print(f"{text:<42}{_fmt(found):<52}{_fmt_expected(expected):<40}{status}")
     print("-" * 150)
+
+
+def main() -> None:
+    results = [(text, expected, *_run_case(text, expected)) for text, expected in CASES]
+    _print_table(results)
+    ok = sum(1 for _, _, status, _ in results if status == _OK)
+    miss = sum(1 for _, _, status, _ in results if status == "MISS")
+    fp = sum(1 for _, _, status, _ in results if status == "FP")
     print(f"Итого: OK={ok}  MISS={miss}  FP={fp}  (всего {len(CASES)})")
 
 

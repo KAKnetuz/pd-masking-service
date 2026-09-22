@@ -35,6 +35,7 @@ class Settings:
     llm_api_key: str
     llm_timeout_seconds: int
     llm_ca_bundle: str
+    debug_shapes: bool = False
 
     def __repr__(self) -> str:
         return self._public_repr()
@@ -61,6 +62,7 @@ class Settings:
             "llm_model": self.llm_model,
             "llm_timeout_seconds": self.llm_timeout_seconds,
             "llm_ca_bundle": self.llm_ca_bundle,
+            "debug_shapes": self.debug_shapes,
         }
         return f"Settings({fields!r})"
 
@@ -90,4 +92,5 @@ class Settings:
             llm_ca_bundle=os.environ.get(
                 "LLM_CA_BUNDLE", "certs/russian_trusted_ca_chain.pem"
             ),
+            debug_shapes=os.environ.get("DEBUG_SHAPES", "false").strip().lower() in {"1", "true", "yes"},
         )
