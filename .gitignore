@@ -11,3 +11,4 @@ env/
 coverage/
 .coverage
 *.zip
+span_audit_report.txt

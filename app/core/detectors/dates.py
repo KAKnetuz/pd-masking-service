@@ -23,11 +23,11 @@ _MONTHS = (
 _NUMERIC_DMY_RE = re.compile(r"(?<![\d.\-/])(\d{1,2})([./\-])(\d{1,2})\2(\d{4}|\d{2})(?![\d.\-/]\d|\d)")
 _NUMERIC_YMD_RE = re.compile(r"(?<![\d.\-/])(\d{4})([./\-])(\d{1,2})\2(\d{1,2})(?![\d.\-/]\d|\d)")
 _TEXT_DATE_RE = re.compile(
-    r"(?<!\d)(\d{1,2})(?:-?го)?\s+(" + _MONTHS + r")\.?\s+(\d{4})(?:\s*(?:г\.|года|год|г\b))?",
+    r"(?<!\d)(\d{1,2})(?:-?го)?\s+(" + _MONTHS + r")\.?\s+(\d{4})",
     FLAGS,
 )
 _MONTH_YEAR_RE = re.compile(
-    r"(?<![\dА-Яа-яЁё])(" + _MONTHS + r")\.?\s+(\d{4})(?:\s*(?:г\.|года|г\b))?", FLAGS
+    r"(?<![\dА-Яа-яЁё])(" + _MONTHS + r")\.?\s+(\d{4})", FLAGS
 )
 
 _BIRTH_CUE_RE = re.compile(

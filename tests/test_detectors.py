@@ -16,7 +16,7 @@ POSITIVE = [
     (PDType.DEPARTMENT_CODE, "код подразделения 770-001", "770-001"),
     (PDType.PASSPORT_ISSUER, "выдан ОВД района Хамовники г. Москвы 12.03.2010", "ОВД района Хамовники г. Москвы"),
     (PDType.PASSPORT_ISSUE_DATE, "дата выдачи 03.12.2010", "03.12.2010"),
-    (PDType.BIRTH_DATE, "Дата рождения: 12 марта 1990 г.", "12 марта 1990 г."),
+    (PDType.BIRTH_DATE, "Дата рождения: 12 марта 1990 г.", "12 марта 1990"),
     (PDType.BIRTH_DATE, "дата рождения 1990.12.03", "1990.12.03"),
     (PDType.BIRTH_PLACE, "место рождения: г. Нижний Новгород", "Нижний Новгород"),
     (PDType.CITIZENSHIP, "Гражданство: Российская Федерация", "Российская Федерация"),
@@ -64,6 +64,15 @@ def test_address_components() -> None:
 def test_weak_entities_need_context() -> None:
     assert _found("Скидка действует до 12/27") == []
     assert (PDType.CARD_EXPIRY, "12/27") in _found("карта 4276 1234 5678 9010 12/27")
+
+
+def test_text_date_trailing_words_excluded() -> None:
+    """Слова-хвосты «года/год/г./г.р.» не входят в фрагмент даты."""
+    assert _found("Она родилась 12 марта 1990 года в Москве.") == [
+        (PDType.BIRTH_DATE, "12 марта 1990")
+    ]
+    assert _found("Дата рождения 12 марта 1990 г.") == [(PDType.BIRTH_DATE, "12 марта 1990")]
+    assert _found("05.11.1985 г.р.") == [(PDType.BIRTH_DATE, "05.11.1985")]
 
 
 def test_combination_rule() -> None:
