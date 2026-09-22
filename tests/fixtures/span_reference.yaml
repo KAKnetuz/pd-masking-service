@@ -1,0 +1,247 @@
+# Эталонные границы фрагментов ПД для политики "default".
+# expected — список сущностей в порядке позиции в тексте: тип и точные подстроки частей.
+- id: 1
+  title: ФИО
+  text: "Клиент Иванов Иван Иванович обратился в банк."
+  expected:
+    - type: fio
+      parts: ["Иванов Иван Иванович"]
+
+- id: 2
+  title: ФИО верхний регистр
+  text: "КЛИЕНТ ПЕТРОВА АННА СЕРГЕЕВНА ПРОСИТ ПЕРЕЗВОНИТЬ."
+  expected:
+    - type: fio
+      parts: ["ПЕТРОВА АННА СЕРГЕЕВНА"]
+
+- id: 3
+  title: ФИО нижний регистр
+  text: "звонил иванов иван иванович по поводу вклада."
+  expected:
+    - type: fio
+      parts: ["иванов иван иванович"]
+
+- id: 4
+  title: Дата дд.мм.гггг
+  text: "Дата рождения: 12.03.1990."
+  expected:
+    - type: birth_date
+      parts: ["12.03.1990"]
+
+- id: 5
+  title: Дата мм.дд.гггг
+  text: "Дата рождения 03.25.1990."
+  expected:
+    - type: birth_date
+      parts: ["03.25.1990"]
+
+- id: 6
+  title: Дата гггг.дд.мм
+  text: "Дата рождения 1990.25.03."
+  expected:
+    - type: birth_date
+      parts: ["1990.25.03"]
+
+- id: 7
+  title: Дата текстом
+  text: "Она родилась 12 марта 1990 года в Москве."
+  expected:
+    - type: birth_date
+      parts: ["12 марта 1990"]
+
+- id: 8
+  title: Место рождения
+  text: "Место рождения: г. Краснодар."
+  expected:
+    - type: birth_place
+      parts: ["Краснодар"]
+
+- id: 9
+  title: Паспорт
+  text: "Паспорт 4509 123456."
+  expected:
+    - type: passport
+      parts: ["4509", "123456"]
+
+- id: 10
+  title: Паспорт серия номер
+  text: "Паспорт серия 4510 номер 654321."
+  expected:
+    - type: passport
+      parts: ["4510", "654321"]
+
+- id: 11
+  title: Паспорт серии №
+  text: "Паспорт серии 45 09 № 123456."
+  expected:
+    - type: passport
+      parts: ["45 09", "123456"]
+
+- id: 12
+  title: Гражданство
+  text: "Гражданство: Российская Федерация."
+  expected:
+    - type: citizenship
+      parts: ["Российская Федерация"]
+
+- id: 13
+  title: Орган выдачи
+  text: "Паспорт выдан ОУФМС России по г. Москве."
+  expected:
+    - type: passport_issuer
+      parts: ["ОУФМС России по г. Москве"]
+
+- id: 14
+  title: Код подразделения
+  text: "Код подразделения 770-001."
+  expected:
+    - type: department_code
+      parts: ["770-001"]
+
+- id: 15
+  title: Дата выдачи
+  text: "Дата выдачи паспорта 15.06.2015."
+  expected:
+    - type: passport_issue_date
+      parts: ["15.06.2015"]
+
+- id: 16
+  title: ВУ
+  text: "Водительское удостоверение 77 АВ 123456."
+  expected:
+    - type: driver_license
+      parts: ["77 АВ", "123456"]
+
+- id: 17
+  title: ВУ цифрами
+  text: "Водительское удостоверение 9901 123456."
+  expected:
+    - type: driver_license
+      parts: ["9901", "123456"]
+
+- id: 18
+  title: Адрес
+  text: "Проживает по адресу: 350000, Россия, г. Краснодар, ул. Красная, д. 10, кв. 5."
+  expected:
+    - type: address
+      parts: ["350000"]
+    - type: address
+      parts: ["Россия"]
+    - type: address
+      parts: ["Краснодар"]
+    - type: address
+      parts: ["Красная"]
+    - type: address
+      parts: ["10"]
+    - type: address
+      parts: ["5"]
+
+- id: 19
+  title: Email
+  text: "Пишите на ivan.petrov@mail.ru."
+  expected:
+    - type: email
+      parts: ["ivan.petrov@mail.ru"]
+
+- id: 20
+  title: Телефон 1
+  text: "Телефон +7 (916) 123-45-67."
+  expected:
+    - type: phone
+      parts: ["+7 (916) 123-45-67"]
+
+- id: 21
+  title: Телефон 2
+  text: "Мой номер 89161234567."
+  expected:
+    - type: phone
+      parts: ["89161234567"]
+
+- id: 22
+  title: ИНН
+  text: "ИНН 500100732259."
+  expected:
+    - type: inn
+      parts: ["500100732259"]
+
+- id: 23
+  title: Карта
+  text: "Номер карты 2200 1234 5678 9019."
+  expected:
+    - type: card_number
+      parts: ["2200 1234 5678 9019"]
+
+- id: 24
+  title: CVV
+  text: "CVV 123."
+  expected:
+    - type: cvv
+      parts: ["123"]
+
+- id: 25
+  title: PIN один
+  text: "Пин-код 4321."
+  expected:
+    - type: pin
+      parts: ["4321"]
+
+- id: 26
+  title: Карта полностью
+  text: "Карта 2200 1234 5678 9019, держатель IVAN IVANOV, CVV 123, пин-код 4321."
+  expected:
+    - type: card_number
+      parts: ["2200 1234 5678 9019"]
+    - type: card_holder
+      parts: ["IVAN IVANOV"]
+    - type: cvv
+      parts: ["123"]
+    - type: pin
+      parts: ["4321"]
+
+- id: 27
+  title: Ловушка Пушкин
+  text: "Александр Пушкин написал «Евгения Онегина»."
+  expected: []
+
+- id: 28
+  title: Ловушка отделение
+  text: "Отделение банка находится по адресу: г. Москва, ул. Каланчевская, д. 27."
+  expected: []
+
+- id: 29
+  title: Без ПД
+  text: "Какие документы нужны для открытия вклада?"
+  expected: []
+
+- id: 30
+  title: Сложное предложение
+  text: "Клиент Сидоров Пётр Алексеевич, 05.11.1985 г.р., паспорт серия 4511 номер 987654 выдан ОУФМС России по г. Краснодару 20.01.2010, код подразделения 230-001, проживает: г. Краснодар, ул. Северная, д. 5, кв. 12, тел. +7 918 555-44-33, email sidorov@yandex.ru, ИНН 500100732259, просит перевыпустить карту 2200 1234 5678 9019."
+  expected:
+    - type: fio
+      parts: ["Сидоров Пётр Алексеевич"]
+    - type: birth_date
+      parts: ["05.11.1985"]
+    - type: passport
+      parts: ["4511", "987654"]
+    - type: passport_issuer
+      parts: ["ОУФМС России по г. Краснодару"]
+    - type: passport_issue_date
+      parts: ["20.01.2010"]
+    - type: department_code
+      parts: ["230-001"]
+    - type: address
+      parts: ["Краснодар"]
+    - type: address
+      parts: ["Северная"]
+    - type: address
+      parts: ["5"]
+    - type: address
+      parts: ["12"]
+    - type: phone
+      parts: ["+7 918 555-44-33"]
+    - type: email
+      parts: ["sidorov@yandex.ru"]
+    - type: inn
+      parts: ["500100732259"]
+    - type: card_number
+      parts: ["2200 1234 5678 9019"]
