@@ -24,7 +24,7 @@ def test_mask_then_unmask_roundtrip() -> None:
         proc, policy = _processor(), POLICIES.resolve(None)
         masked = await proc.process("id-1", SOURCE, policy)
         assert masked.direction is Direction.MASK
-        assert masked.result == "Клиент И. И. И., паспорт 45** ****56"
+        assert masked.result == "Клиент ****** **** ********, паспорт **** ******"
         restored = await proc.process("id-1", masked.result, policy)
         assert restored.direction is Direction.UNMASK
         assert restored.result == SOURCE

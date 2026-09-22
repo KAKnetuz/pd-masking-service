@@ -14,19 +14,19 @@ default_system: default
 
 # Вид маски по умолчанию для всех систем.
 masking:
-  fio:                 {strategy: initials}
-  card_holder:         {strategy: initials}
-  passport:            {strategy: partial, keep_start: 2, keep_end: 2}
-  driver_license:      {strategy: partial, keep_start: 2, keep_end: 2}
-  foreign_passport:    {strategy: partial, keep_start: 2, keep_end: 2}
-  military_id:         {strategy: partial, keep_start: 2, keep_end: 2}
-  birth_certificate:   {strategy: partial, keep_start: 2, keep_end: 2}
-  snils:               {strategy: partial, keep_start: 2, keep_end: 2}
-  inn:                 {strategy: partial, keep_start: 2, keep_end: 2}
-  phone:               {strategy: partial, keep_start: 2, keep_end: 2}
-  card_number:         {strategy: partial, keep_start: 4, keep_end: 4}
+  fio:                 {strategy: full}
+  card_holder:         {strategy: full}
+  passport:            {strategy: full}
+  driver_license:      {strategy: full}
+  foreign_passport:    {strategy: full}
+  military_id:         {strategy: full}
+  birth_certificate:   {strategy: full}
+  snils:               {strategy: full}
+  inn:                 {strategy: full}
+  phone:               {strategy: full}
+  card_number:         {strategy: full}
   department_code:     {strategy: full}
-  email:               {strategy: email}
+  email:               {strategy: full}
   cvv:                 {strategy: full}
   pin:                 {strategy: full}
   card_expiry:         {strategy: full}
