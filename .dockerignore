@@ -10,3 +10,6 @@ __pycache__
 tests
 load
 *.zip
+pd-capture/
+gold/
+*.gold.csv
