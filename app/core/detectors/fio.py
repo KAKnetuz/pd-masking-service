@@ -192,7 +192,18 @@ class FioDetector(Detector):
                     break
                 run.append(nxt)
                 k += 1
-            if len(run) < 2 or any(t.lower in _NOT_NAME_WORDS for t in run):
+            if len(run) < 2:
+                # Одиночная фамилия после подсказки («Клиент Сидоров», «клиент сидоров»).
+                if (
+                    len(run) == 1
+                    and run[0].surname
+                    and not run[0].first
+                    and not run[0].patronymic
+                    and run[0].lower not in _NOT_NAME_WORDS
+                ):
+                    yield make_entity(PDType.FIO, [(run[0].start, run[0].end)], priority=58)
+                continue
+            if any(t.lower in _NOT_NAME_WORDS for t in run):
                 continue
             if all(t.capitalized for t in run) or any(t.first or t.patronymic for t in run):
                 yield make_entity(PDType.FIO, [(run[0].start, run[-1].end)], priority=58)

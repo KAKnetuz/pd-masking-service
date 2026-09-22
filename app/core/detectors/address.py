@@ -29,7 +29,15 @@ _COMPONENT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
             FLAGS,
         ),
     ),
+    (
+        "country",
+        re.compile(
+            r"страна\w*\s*[:\-–]?\s*(?-i:(Россия|Российская\s+Федерация|РФ|Беларусь|Казахстан))",
+            FLAGS,
+        ),
+    ),
     ("index", re.compile(r"(?:индекс\w*\s*[:\-]?\s*)?(?<!\d)(\d{6})(?!\d)(?=\s*,)", FLAGS)),
+    ("index", re.compile(r"индекс\w*\s*[:\-]?\s*(?<!\d)(\d{6})(?!\d)", FLAGS)),
     (
         "region",
         re.compile(
@@ -46,7 +54,8 @@ _COMPONENT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "city",
         re.compile(
-            _NB + r"(?:г\.|гор\.|город\w*|пгт\.?|пос\.|посёлок|поселок|с\.|село|дер\.|деревн\w+|ст-ца|станиц\w+)"
+            _NB + r"(?:г\.(?!р\.|рожд)|гор\.|город\w*|г(?=\s)|пгт\.?|пос\.|посёлок|поселок|с\.|село"
+            r"|дер\.|деревн\w+|ст-ца|станиц\w+)"
             r"\s*([А-ЯЁа-яё][А-ЯЁа-яё\-]*(?:\s+(?-i:[А-ЯЁ])[а-яё\-]+)?)",
             FLAGS,
         ),
@@ -54,10 +63,10 @@ _COMPONENT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "street",
         re.compile(
-            _NB + r"(?:ул\.|улиц\w*|пр-т|пр-кт|просп\.|проспект\w*|пер\.|переул\w*|б-р|бул\.|бульвар\w*"
+            _NB + r"(?:ул\.|ул\b|улиц\w*|пр-т|пр-кт|просп\.|проспект\w*|пер\.|переул\w*|б-р|бул\.|бульвар\w*"
             r"|ш\.|шоссе|наб\.|набережн\w*|пл\.|площад\w*|проезд\w*|мкр\.?|микрорайон\w*|туп\.|тупик\w*"
             r"|алле[яи]|линия|тракт)\s*"
-            r"((?:\d{1,3}(?:-?(?:я|й|го|ая|ой))?\s+)?[А-ЯЁа-яё][А-ЯЁа-яё\-]*(?:\s+(?-i:[А-ЯЁ0-9])[А-ЯЁа-яё\-]*){0,2})",
+            r"((?:\d{1,3}(?:-?(?:я|й|го|ая|ой))?\s+)?[А-ЯЁа-яё][А-ЯЁа-яё\-]*(?:\s+(?-i:[А-ЯЁ0-9])[А-ЯЁа-яё][А-ЯЁа-яё\-]*){0,2})",
             FLAGS,
         ),
     ),
@@ -80,7 +89,7 @@ _COMPONENT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "building",
         re.compile(
-            _NB + r"(?:корп\.|корпус\w*|к\.|стр\.|строени\w+|лит\.|литер\w*)\s*"
+            _NB + r"(?:корп\.|корп\b|корпус\w*|к\.|стр\.|строени\w+|лит\.|литер\w*)\s*"
             r"(\d{1,3}[А-Яа-я]?|[А-ЯЁ])(?![\dА-Яа-яЁё])",
             FLAGS,
         ),
@@ -94,6 +103,9 @@ _COMPONENT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
 )
+
+# Номер дома сразу после названия улицы (через запятую или пробел): «ул. Красная, 10», «ул Красная 10-5».
+_BARE_HOUSE_RE = re.compile(r"\s*[,]?\s*(\d{1,4}(?:-\d{1,4})?[А-Яа-я]?)(?!\d)")
 
 _CITIES = frozenset(
     """
@@ -109,10 +121,11 @@ _LOCALITY_RE = re.compile(r"(?-i:[А-ЯЁ][а-яё]+(?:-на-[А-ЯЁ][а-яё]+
 _GAP_RE = re.compile(r"[\s,;]{0,4}")
 
 # Адрес организации (отделения банка и т.п.) — не персональные данные.
+# Признак организации: любое слово, содержащее «банк», а также «офис», «отделение», «филиал»
+# в том же предложении перед адресом.
 _ORG_CUE_RE = re.compile(
-    r"отделени\w*|филиал\w*|банкомат\w*|терминал\w*|\bдо\s+«|доп(?:олнительн\w*)?\.?\s+офис\w*"
-    r"|офис\w*\s+(?:банка|компании|продаж|обслуживани)|альфа-?\s?банк\w*|\bбанк\w*"
-    r"|пункт\w*\s+выдачи|магазин\w*|\bтц\b|торгов\w+\s+центр\w*|ресторан\w*|кафе|музе\w*|театр\w*",
+    r"[А-Яа-яЁё]*банк[А-Яа-яЁё]*|отделени\w*|филиал\w*|банкомат\w*|терминал\w*|\bдо\s+«|доп(?:олнительн\w*)?\.?\s+офис\w*"
+    r"|офис\w*|пункт\w*\s+выдачи|магазин\w*|\bтц\b|торгов\w+\s+центр\w*|ресторан\w*|кафе|музе\w*|театр\w*",
     FLAGS,
 )
 # Адресный контекст клиента: позволяет маскировать даже одиночный компонент.
@@ -121,6 +134,7 @@ _PERSONAL_CUE_RE = re.compile(
     r"|место\s+жительства|доставк\w*|по\s+месту",
     FLAGS,
 )
+_SENTENCE_START_RE = re.compile(r"[.!?…]\s+")
 
 
 @dataclass(slots=True)
@@ -135,6 +149,18 @@ def _gap_ok(text: str, start: int, end: int) -> bool:
     return start <= end and _GAP_RE.fullmatch(text, start, end) is not None
 
 
+def _org_cue_before(pos: int, org_positions: list[int], sentence_starts: list[int]) -> bool:
+    """Есть ли признак организации в текущем предложении перед позицией (бинарный поиск)."""
+    import bisect
+
+    # Начало текущего предложения: наибольший sentence_start <= pos.
+    si = bisect.bisect_right(sentence_starts, pos) - 1
+    sentence_start = sentence_starts[si]
+    # Есть ли признак организации в [sentence_start, pos).
+    oi = bisect.bisect_left(org_positions, sentence_start)
+    return oi < len(org_positions) and org_positions[oi] < pos
+
+
 class AddressDetector(Detector):
     types = frozenset({PDType.ADDRESS})
 
@@ -143,11 +169,18 @@ class AddressDetector(Detector):
         if not components:
             return
         components = self._add_localities(text, components)
+        components = self._add_bare_house(text, components)
+        # Признаки организации и границы предложений — один проход, дальше бинарный поиск.
+        org_positions = [m.start() for m in _ORG_CUE_RE.finditer(text)]
+        sentence_starts = [0] + [m.end() for m in _SENTENCE_START_RE.finditer(text)]
         for chain in self._chains(text, components):
-            if cue_before(text, chain[0].start, _ORG_CUE_RE, window=80):
+            if _org_cue_before(chain[0].start, org_positions, sentence_starts):
                 continue
-            if len(chain) < 2 and not cue_before(text, chain[0].start, _PERSONAL_CUE_RE, window=60):
-                continue
+            if len(chain) < 2:
+                comp = chain[0]
+                has_label = comp.start < comp.value[0]
+                if not has_label and not cue_before(text, comp.start, _PERSONAL_CUE_RE, window=60):
+                    continue
             for comp in chain:
                 yield make_entity(PDType.ADDRESS, [comp.value], priority=50, subtype=comp.kind)
 
@@ -179,6 +212,21 @@ class AddressDetector(Detector):
                 continue
             if any(_gap_ok(text, m.end(), c.start) or _gap_ok(text, c.end, m.start()) for c in components):
                 extra.append(_Component("city", m.start(), m.end(), (m.start(), m.end())))
+        return sorted(components + extra, key=lambda c: c.start)
+
+    @staticmethod
+    def _add_bare_house(text: str, components: list[_Component]) -> list[_Component]:
+        """Номер дома сразу после названия улицы: «ул. Красная, 10», «ул Красная 10-5»."""
+        extra: list[_Component] = []
+        for comp in components:
+            if comp.kind != "street":
+                continue
+            m = _BARE_HOUSE_RE.match(text, comp.end)
+            if not m:
+                continue
+            if any(c.start <= m.start() < c.end for c in components):
+                continue
+            extra.append(_Component("house", m.start(), m.end(), (m.start(1), m.end(1))))
         return sorted(components + extra, key=lambda c: c.start)
 
     @staticmethod

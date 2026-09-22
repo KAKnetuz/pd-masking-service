@@ -55,6 +55,11 @@ _PHONE_CTX_RE = re.compile(
     FLAGS,
 )
 
+# Номера 8-800 / +7 800 — телефоны организаций, а не ПД клиента.
+def _is_org_phone(value: str) -> bool:
+    digits = digits_only(value)
+    return digits.startswith("8800") or digits.startswith("7800")
+
 
 def _group(m: re.Match[str]) -> list[tuple[int, int]]:
     return [(m.start(1), m.end(1))]
@@ -109,6 +114,10 @@ class ContactDetector(Detector):
                 yield make_entity(PDType.EMAIL, [(m.start(), m.end())], priority=90)
         for pattern in (_PHONE_RU_RE, _PHONE_INTL_RE):
             for m in pattern.finditer(text):
+                if _is_org_phone(m.group(0)):
+                    continue
                 yield make_entity(PDType.PHONE, [(m.start(), m.end())], priority=65)
         for m in _PHONE_CTX_RE.finditer(text):
+            if _is_org_phone(m.group(1)):
+                continue
             yield make_entity(PDType.PHONE, _group(m), priority=64)

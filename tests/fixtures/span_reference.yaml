@@ -245,3 +245,142 @@
       parts: ["500100732259"]
     - type: card_number
       parts: ["2200 1234 5678 9019"]
+
+- id: 31
+  title: Адрес индекс с меткой
+  text: "Индекс 350000"
+  expected:
+    - type: address
+      parts: ["350000"]
+
+- id: 32
+  title: Адрес страна с меткой
+  text: "Страна: Россия"
+  expected:
+    - type: address
+      parts: ["Россия"]
+
+- id: 33
+  title: Адрес город с меткой
+  text: "город Сочи"
+  expected:
+    - type: address
+      parts: ["Сочи"]
+
+- id: 34
+  title: Адрес улица с меткой
+  text: "улица Ленина"
+  expected:
+    - type: address
+      parts: ["Ленина"]
+
+- id: 35
+  title: Адрес дом с меткой
+  text: "дом 15"
+  expected:
+    - type: address
+      parts: ["15"]
+
+- id: 36
+  title: Адрес квартира с меткой
+  text: "квартира 42"
+  expected:
+    - type: address
+      parts: ["42"]
+
+- id: 37
+  title: Адрес сокращения без точки
+  text: "проживаю: Краснодар, ул Красная 10-5"
+  expected:
+    - type: address
+      parts: ["Краснодар"]
+    - type: address
+      parts: ["Красная"]
+    - type: address
+      parts: ["10-5"]
+
+- id: 38
+  title: Адрес номер дома без метки
+  text: "проживаю: Краснодар, ул. Красная, 10, кв. 5"
+  expected:
+    - type: address
+      parts: ["Краснодар"]
+    - type: address
+      parts: ["Красная"]
+    - type: address
+      parts: ["10"]
+    - type: address
+      parts: ["5"]
+
+- id: 39
+  title: Адрес полный без точек
+  text: "123456, г Казань, пр-т Победы, дом 5 корп 2 кв 7"
+  expected:
+    - type: address
+      parts: ["123456"]
+    - type: address
+      parts: ["Казань"]
+    - type: address
+      parts: ["Победы"]
+    - type: address
+      parts: ["5"]
+    - type: address
+      parts: ["2"]
+    - type: address
+      parts: ["7"]
+
+- id: 40
+  title: Ловушка историческая дата Пушкин
+  text: "Александр Сергеевич Пушкин родился 6 июня 1799 года в Москве"
+  expected: []
+
+- id: 41
+  title: Ловушка историческая дата Толстой
+  text: "Лев Толстой родился 9 сентября 1828 года"
+  expected: []
+
+- id: 42
+  title: Ловушка адрес организации банк
+  text: "Сбербанк находится на ул. Вавилова, д. 19"
+  expected: []
+
+- id: 43
+  title: Ловушка телефон 8-800
+  text: "Тел. поддержки банка 8 800 200-00-00"
+  expected: []
+
+- id: 44
+  title: Фамилия после подсказки
+  text: "Клиент Сидоров оставил заявку"
+  expected:
+    - type: fio
+      parts: ["Сидоров"]
+
+- id: 45
+  title: Фамилия после подсказки нижний регистр
+  text: "клиент сидоров"
+  expected:
+    - type: fio
+      parts: ["сидоров"]
+
+- id: 46
+  title: Ловушка клиент банка
+  text: "Клиент банка оставил заявку"
+  expected: []
+
+- id: 47
+  title: Ловушка клиент Альфа-Банка
+  text: "Клиент Альфа-Банка"
+  expected: []
+
+- id: 48
+  title: Ловушка гражданин РФ
+  text: "Гражданин РФ"
+  expected: []
+
+- id: 49
+  title: Код подразделения с сокращением
+  text: "код подр. 230-005"
+  expected:
+    - type: department_code
+      parts: ["230-005"]

@@ -57,6 +57,9 @@ def _normalize_year(raw: str) -> int:
 
 
 def _classify(text: str, start: int, end: int, year: int, shift: int = 0) -> Entity | None:
+    # Исторические даты (год < 1900) не являются ПД клиента.
+    if year < 1900:
+        return None
     parts = [(start, end)]
     if cue_before(text, start, _BIRTH_CUE_RE, window=35) or _BIRTH_AFTER_RE.match(text, end):
         return make_entity(PDType.BIRTH_DATE, parts, priority=64 + shift)
