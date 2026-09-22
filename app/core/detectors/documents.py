@@ -62,7 +62,7 @@ _COUNTRIES = (
 )
 _CITIZENSHIP_RE = re.compile(
     r"(?:гражданств\w*|подданств\w*|гражданин\w*|гражданк\w*|citizenship|nationality)"
-    r"\s*[:\-–]\s*(" + _COUNTRIES + r")(?![А-Яа-яЁё])",
+    r"\s*[:\-–]?\s*(" + _COUNTRIES + r")(?![А-Яа-яЁё])",
     FLAGS,
 )
 

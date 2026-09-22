@@ -374,9 +374,11 @@
   expected: []
 
 - id: 48
-  title: Ловушка гражданин РФ
+  title: Гражданин РФ
   text: "Гражданин РФ"
-  expected: []
+  expected:
+    - type: citizenship
+      parts: ["РФ"]
 
 - id: 49
   title: Код подразделения с сокращением
@@ -384,3 +386,24 @@
   expected:
     - type: department_code
       parts: ["230-005"]
+
+- id: 50
+  title: Гражданство РФ без двоеточия
+  text: "гражданство РФ"
+  expected:
+    - type: citizenship
+      parts: ["РФ"]
+
+- id: 51
+  title: Гражданин Украины
+  text: "гражданин Украины"
+  expected:
+    - type: citizenship
+      parts: ["Украины"]
+
+- id: 52
+  title: Гражданка Республики Беларусь
+  text: "гражданка Республики Беларусь"
+  expected:
+    - type: citizenship
+      parts: ["Республики Беларусь"]
