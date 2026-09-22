@@ -31,6 +31,8 @@ POLICY = POLICIES.resolve(None)  # политика "default"
 
 CASES = yaml.safe_load(FIXTURES.read_text(encoding="utf-8")) or []
 
+TEST_TTL_SECONDS = 60
+
 
 def _ids() -> list[str]:
     return [f"{case['id']}-{case['title']}" for case in CASES]
@@ -40,14 +42,17 @@ def _processor() -> Processor:
     return Processor(
         DetectionEngine(),
         Masker(os.urandom(32)),
-        MemoryStore(RecordCodec(os.urandom(32)), 60),
+        MemoryStore(RecordCodec(os.urandom(32)), TEST_TTL_SECONDS),
     )
 
 
 def _found(text: str) -> list[tuple[str, list[str]]]:
     engine = DetectionEngine()
     entities = engine.detect(text, POLICY.pd_types, POLICY.combinations)
-    return [(e.pd_type.value, [text[s:e] for s, e in e.parts]) for e in entities]
+    return [
+        (entity.pd_type.value, [text[start:end] for start, end in entity.parts])
+        for entity in entities
+    ]
 
 
 @pytest.mark.parametrize("case", CASES, ids=_ids())
@@ -75,10 +80,12 @@ def test_no_leak_of_parts_in_masked(case: dict) -> None:
         masked = (await proc.process(f"ref-{case['id']}", case["text"], POLICY)).result
         for item in case["expected"]:
             for part in item["parts"]:
-                # Подстрока не должна остаться открытой как самостоятельный фрагмент
-                # (граница слова), чтобы короткие части не давали ложных срабатываний
-                # из-за совпадения с другими замаскированными значениями.
-                assert not re.search(rf"\b{re.escape(part)}\b", masked), (
+                # Подстрока не должна остаться открытой как самостоятельный фрагмент:
+                # слева и справа от неё не должно быть соседних букв/цифр. Используем
+                # lookbehind/lookahead (?<!\w)/(?!\w), а не \b, потому что \b не работает,
+                # если фрагмент начинается или заканчивается не буквой/цифрой
+                # (например "+7 918 555-44-33"), и тогда утечка не была бы поймана.
+                assert not re.search(rf"(?<!\w){re.escape(part)}(?!\w)", masked), (
                     f"утечка подстроки {part!r} в маске: {masked!r}"
                 )
 
