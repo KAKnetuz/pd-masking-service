@@ -70,7 +70,7 @@ class Settings:
             storage_backend=os.environ.get("STORAGE_BACKEND", "memory"),
             redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
             redis_timeout_seconds=_float("REDIS_TIMEOUT_SECONDS", 2.0),
-            redis_max_connections=_int("REDIS_MAX_CONNECTIONS", 64),
+            redis_max_connections=_int("REDIS_MAX_CONNECTIONS", 128),
             mapping_ttl_seconds=_int("MAPPING_TTL_SECONDS", 3600),
             encryption_key=os.environ.get("ENCRYPTION_KEY", ""),
             token_secret=os.environ.get("TOKEN_SECRET", ""),
@@ -78,7 +78,7 @@ class Settings:
             system_header=os.environ.get("SYSTEM_HEADER", "X-System-Id"),
             max_payload_chars=_int("MAX_PAYLOAD_CHARS", 1_000_000),
             max_payload_id_chars=_int("MAX_PAYLOAD_ID_CHARS", 256),
-            max_inflight=_int("MAX_INFLIGHT", 512),
+            max_inflight=_int("MAX_INFLIGHT", 64),
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
             llm_provider=os.environ.get("LLM_PROVIDER", "stub"),
             llm_base_url=os.environ.get(

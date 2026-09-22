@@ -13,7 +13,7 @@ import time
 
 _ALLOWED_FIELDS = (
     "request_id",
-    "payload_id",
+    "payload_id_hash",
     "system_id",
     "direction",
     "status",

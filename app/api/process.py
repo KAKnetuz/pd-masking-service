@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 import uuid
@@ -68,7 +69,7 @@ async def process(body: ProcessRequest, request: Request) -> Response:
         "processed",
         extra={
             "request_id": request_id,
-            "payload_id": body.payload_id,
+            "payload_id_hash": hashlib.sha256(body.payload_id.encode()).hexdigest()[:16],
             "system_id": policy.system_id,
             "direction": direction,
             "latency_ms": round(elapsed * 1000, 2),

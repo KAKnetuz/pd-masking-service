@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from app.api.process import json_response
+from app.api.responses import json_response
 from app.observability.metrics import render_metrics
 
 router = APIRouter()

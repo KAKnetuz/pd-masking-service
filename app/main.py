@@ -15,6 +15,7 @@ from app.api import chat as chat_api
 from app.api import process as process_api
 from app.api import service as service_api
 from app.api.limiter import InflightLimitMiddleware
+from app.api.responses import json_response
 from app.core.chat_proxy import ChatProxy
 from app.core.engine import DetectionEngine
 from app.core.masking import Masker
@@ -89,12 +90,12 @@ def create_app(settings: Settings | None = None, store_override: MappingStore | 
     async def validation_error(_: Request, exc: RequestValidationError) -> Response:
         # Стандартный ответ FastAPI возвращает входные данные — с ПД. Отдаём только поля.
         fields = sorted({".".join(str(p) for p in err.get("loc", ())) for err in exc.errors()})
-        return process_api.json_response({"detail": "некорректный запрос", "fields": fields}, 400)
+        return json_response({"detail": "некорректный запрос", "fields": fields}, 400)
 
     @app.exception_handler(Exception)
     async def unhandled_error(_: Request, exc: Exception) -> Response:
         log.error("unhandled_error", extra={"error": type(exc).__name__})
-        return process_api.json_response({"detail": "внутренняя ошибка сервиса"}, 500)
+        return json_response({"detail": "внутренняя ошибка сервиса"}, 500)
 
     return app
 

@@ -45,3 +45,23 @@ def test_service_endpoints() -> None:
         assert client.get("/health").json() == {"status": "ok"}
         assert client.get("/ready").status_code == 200
         assert b"pd_requests_total" in client.get("/metrics").content
+
+
+def test_log_hashes_payload_id(capsys) -> None:
+    """В логе обработанного запроса нет исходного payload_id, есть payload_id_hash."""
+    import hashlib
+    import json
+
+    payload_id = "secret-payload-id-123"
+    with _client() as client:
+        client.post("/process", json={"payload": SOURCE, "payload_id": payload_id})
+    captured = capsys.readouterr().out
+    processed = [
+        json.loads(line)
+        for line in captured.splitlines()
+        if '"event": "processed"' in line
+    ]
+    assert processed, "не найден лог 'processed'"
+    record = processed[-1]
+    assert record["payload_id_hash"] == hashlib.sha256(payload_id.encode()).hexdigest()[:16]
+    assert "payload_id" not in record
