@@ -14,6 +14,7 @@ from app.api.responses import json_response
 from app.core.policy import SystemNotAllowedError
 from app.core.processor import UnmaskForbiddenError
 from app.observability.metrics import LATENCY, PD_FOUND, REJECTED, REQUESTS, TOKENS, estimate_tokens
+from app.storage.base import StoreUnavailableError
 
 log = logging.getLogger("pd.process")
 router = APIRouter()
@@ -47,6 +48,13 @@ async def process(body: ProcessRequest, request: Request) -> Response:
     except UnmaskForbiddenError:
         REJECTED.labels("unmask_forbidden").inc()
         return json_response({"detail": "демаскирование запрещено для системы"}, 403)
+    except StoreUnavailableError:
+        log.warning("store_unavailable", extra={"request_id": request_id})
+        return json_response(
+            {"detail": "хранилище временно недоступно, повторите запрос"},
+            503,
+            headers={"Retry-After": "1"},
+        )
 
     elapsed = time.perf_counter() - started
     direction = outcome.direction.value

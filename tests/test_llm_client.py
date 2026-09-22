@@ -20,6 +20,8 @@ def _settings(**overrides: object) -> Settings:
     base: dict[str, object] = {
         "storage_backend": "memory",
         "redis_url": "",
+        "redis_timeout_seconds": 2.0,
+        "redis_max_connections": 64,
         "mapping_ttl_seconds": 60,
         "encryption_key": "",
         "token_secret": "",

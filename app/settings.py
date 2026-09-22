@@ -10,10 +10,16 @@ def _int(name: str, default: int) -> int:
     return int(os.environ.get(name, default))
 
 
+def _float(name: str, default: float) -> float:
+    return float(os.environ.get(name, default))
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     storage_backend: str
     redis_url: str
+    redis_timeout_seconds: float
+    redis_max_connections: int
     mapping_ttl_seconds: int
     encryption_key: str
     token_secret: str
@@ -41,6 +47,8 @@ class Settings:
         fields = {
             "storage_backend": self.storage_backend,
             "redis_url": self.redis_url,
+            "redis_timeout_seconds": self.redis_timeout_seconds,
+            "redis_max_connections": self.redis_max_connections,
             "mapping_ttl_seconds": self.mapping_ttl_seconds,
             "systems_config": self.systems_config,
             "system_header": self.system_header,
@@ -61,6 +69,8 @@ class Settings:
         return cls(
             storage_backend=os.environ.get("STORAGE_BACKEND", "memory"),
             redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
+            redis_timeout_seconds=_float("REDIS_TIMEOUT_SECONDS", 2.0),
+            redis_max_connections=_int("REDIS_MAX_CONNECTIONS", 64),
             mapping_ttl_seconds=_int("MAPPING_TTL_SECONDS", 3600),
             encryption_key=os.environ.get("ENCRYPTION_KEY", ""),
             token_secret=os.environ.get("TOKEN_SECRET", ""),

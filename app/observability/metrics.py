@@ -31,6 +31,7 @@ TOKENS = Counter("pd_tokens_total", "Обработанные токены (оц
 PD_FOUND = Counter("pd_entities_total", "Найденные сущности ПД", ["pd_type"])
 REJECTED = Counter("pd_rejected_total", "Отклонённые запросы", ["reason"])
 STORE_DEGRADED = Counter("pd_store_degraded_total", "Переключения на резервное хранилище")
+STORE_ERRORS = Counter("pd_store_errors_total", "Ошибки хранилища", ["reason"])
 INFLIGHT = Gauge("pd_inflight_requests", "Запросы в обработке", multiprocess_mode="livesum")
 LLM_LATENCY = Histogram(
     "pd_llm_duration_seconds",

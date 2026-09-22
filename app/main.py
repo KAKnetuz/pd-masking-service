@@ -44,17 +44,26 @@ def build_store(settings: Settings, codec: RecordCodec) -> MappingStore:
     from app.storage.fallback import FallbackStore
     from app.storage.redis_store import RedisStore
 
-    return FallbackStore(RedisStore(settings.redis_url, codec, settings.mapping_ttl_seconds), memory)
+    return FallbackStore(
+        RedisStore(
+            settings.redis_url,
+            codec,
+            settings.mapping_ttl_seconds,
+            timeout_seconds=settings.redis_timeout_seconds,
+            max_connections=settings.redis_max_connections,
+        ),
+        memory,
+    )
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, store_override: MappingStore | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     setup_logging(settings.log_level)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         codec = RecordCodec(_secret(settings.encryption_key, "ENCRYPTION_KEY"))
-        store = build_store(settings, codec)
+        store = store_override or build_store(settings, codec)
         llm_client = build_llm_client(settings)
         app.state.settings = settings
         app.state.policies = load_policies(settings.systems_config)

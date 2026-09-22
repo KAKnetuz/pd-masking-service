@@ -14,7 +14,16 @@ class MappingRecord:
 
 
 class StoreUnavailableError(Exception):
-    """Хранилище недоступно (сеть, таймаут, отказ Redis)."""
+    """Хранилище недоступно (сеть, таймаут, отказ Redis).
+
+    reason: "timeout" — Redis жив, но не успел ответить за таймаут (можно ретраить);
+            "connection" — Redis недоступен (сеть/отказ), переключаемся в память.
+    """
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        super().__init__(detail or reason)
+        self.reason = reason
+        self.detail = detail
 
 
 class MappingStore(Protocol):
