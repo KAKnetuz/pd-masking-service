@@ -1,7 +1,7 @@
-﻿// РќР°РіСЂСѓР·РѕС‡РЅС‹Р№ СЃС†РµРЅР°СЂРёР№ РїРѕРґ РїСЂРѕС„РёР»СЊ РїСЂРѕРІРµСЂСЏСЋС‰РµР№ СЃРёСЃС‚РµРјС‹.
-// РћРґРЅР° РёС‚РµСЂР°С†РёСЏ = СЃРёРЅС…СЂРѕРЅРЅР°СЏ РїР°СЂР° В«РјР°СЃРєРёСЂРѕРІР°РЅРёРµ в†’ РґРµРјР°СЃРєРёСЂРѕРІР°РЅРёРµВ» СЃ РѕРґРЅРёРј payload_id.
-// РЎС†РµРЅР°СЂРёР№ РІС‹Р±РёСЂР°РµС‚СЃСЏ РїРµСЂРµРјРµРЅРЅРѕР№ РѕРєСЂСѓР¶РµРЅРёСЏ SCENARIO: checker (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ), rps1000, rps2000.
-// Р—Р°РїСѓСЃРє:
+﻿// Load scenario for the checker profile.
+// One iteration = synchronous pair "masking -> unmasking" with one payload_id.
+// Scenario is selected by the SCENARIO env var: checker (default), rps1000, rps2000.
+// Run:
 //   k6 run load/k6_process.js
 //   k6 run -e SCENARIO=smoke load/k6_process.js
 //   k6 run -e SCENARIO=rps1000 load/k6_process.js
@@ -14,47 +14,32 @@ import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.2/index.js";
 const BASE_URL = __ENV.BASE_URL || "http://51.250.4.227";
 const SCENARIO = __ENV.SCENARIO || "checker";
 
-// РљРѕСЂРѕС‚РєРёРµ С„СЂР°Р·С‹ СЃ РѕРґРЅРёРј С‚РёРїРѕРј РџР” (РїСЂРёРјРµСЂС‹ 1, 4, 9, 10, 16, 18, 19, 20, 22, 23, 26, 27, 28
-// РёР· tests/fixtures/span_reference.yaml). РџСЂРёРјРµСЂС‹ 27 Рё 28 вЂ” В«Р»РѕРІСѓС€РєРёВ» Р±РµР· РџР”.
-const SHORT_SAMPLES = [
-  "РљР»РёРµРЅС‚ РРІР°РЅРѕРІ РРІР°РЅ РРІР°РЅРѕРІРёС‡ РѕР±СЂР°С‚РёР»СЃСЏ РІ Р±Р°РЅРє.",
-  "Р”Р°С‚Р° СЂРѕР¶РґРµРЅРёСЏ: 12.03.1990.",
-  "РџР°СЃРїРѕСЂС‚ 4509 123456.",
-  "РџР°СЃРїРѕСЂС‚ СЃРµСЂРёСЏ 4510 РЅРѕРјРµСЂ 654321.",
-  "Р’РѕРґРёС‚РµР»СЊСЃРєРѕРµ СѓРґРѕСЃС‚РѕРІРµСЂРµРЅРёРµ 77 РђР’ 123456.",
-  "РџСЂРѕР¶РёРІР°РµС‚ РїРѕ Р°РґСЂРµСЃСѓ: 350000, Р РѕСЃСЃРёСЏ, Рі. РљСЂР°СЃРЅРѕРґР°СЂ, СѓР». РљСЂР°СЃРЅР°СЏ, Рґ. 10, РєРІ. 5.",
-  "РџРёС€РёС‚Рµ РЅР° ivan.petrov@mail.ru.",
-  "РўРµР»РµС„РѕРЅ +7 (916) 123-45-67.",
-  "РРќРќ 500100732259.",
-  "РќРѕРјРµСЂ РєР°СЂС‚С‹ 2200 1234 5678 9019.",
-  "РљР°СЂС‚Р° 2200 1234 5678 9019, РґРµСЂР¶Р°С‚РµР»СЊ IVAN IVANOV, CVV 123, РїРёРЅ-РєРѕРґ 4321.",
-  "РђР»РµРєСЃР°РЅРґСЂ РџСѓС€РєРёРЅ РЅР°РїРёСЃР°Р» В«Р•РІРіРµРЅРёСЏ РћРЅРµРіРёРЅР°В».",
-  "РћС‚РґРµР»РµРЅРёРµ Р±Р°РЅРєР° РЅР°С…РѕРґРёС‚СЃСЏ РїРѕ Р°РґСЂРµСЃСѓ: Рі. РњРѕСЃРєРІР°, СѓР». РљР°Р»Р°РЅС‡РµРІСЃРєР°СЏ, Рґ. 27.",
-];
+// Texts are loaded from an ASCII-only JSON produced by scripts/export_load_texts.py.
+const TEXTS = JSON.parse(open("./texts.json"));
 
-// РЎР»РѕР¶РЅРѕРµ РїСЂРµРґР»РѕР¶РµРЅРёРµ (РїСЂРёРјРµСЂ 30 РёР· span_reference.yaml).
-const COMPLEX_SAMPLE =
-  "РљР»РёРµРЅС‚ РЎРёРґРѕСЂРѕРІ РџС‘С‚СЂ РђР»РµРєСЃРµРµРІРёС‡, 05.11.1985 Рі.СЂ., РїР°СЃРїРѕСЂС‚ СЃРµСЂРёСЏ 4511 РЅРѕРјРµСЂ 987654 РІС‹РґР°РЅ РћРЈР¤РњРЎ Р РѕСЃСЃРёРё РїРѕ Рі. РљСЂР°СЃРЅРѕРґР°СЂСѓ 20.01.2010, РєРѕРґ РїРѕРґСЂР°Р·РґРµР»РµРЅРёСЏ 230-001, РїСЂРѕР¶РёРІР°РµС‚: Рі. РљСЂР°СЃРЅРѕРґР°СЂ, СѓР». РЎРµРІРµСЂРЅР°СЏ, Рґ. 5, РєРІ. 12, С‚РµР». +7 918 555-44-33, email sidorov@yandex.ru, РРќРќ 500100732259, РїСЂРѕСЃРёС‚ РїРµСЂРµРІС‹РїСѓСЃС‚РёС‚СЊ РєР°СЂС‚Сѓ 2200 1234 5678 9019.";
-
-// Р”Р»РёРЅРЅС‹Р№ С‚РµРєСЃС‚ ~20 000 СЃРёРјРІРѕР»РѕРІ: СЃР»РѕР¶РЅРѕРµ РїСЂРµРґР»РѕР¶РµРЅРёРµ, РїРѕРІС‚РѕСЂС‘РЅРЅРѕРµ РЅСѓР¶РЅРѕРµ С‡РёСЃР»Рѕ СЂР°Р·.
-let LONG_TEXT = "";
-while (LONG_TEXT.length < 20000) {
-  LONG_TEXT += COMPLEX_SAMPLE + " ";
+// Long text: complex sample repeated until at least 20000 chars.
+function buildLongText() {
+  let text = "";
+  while (text.length < 20000) {
+    text += TEXTS.complex.text + " ";
+  }
+  return text;
 }
+const LONG_TEXT = buildLongText();
 
-// Р’С‹Р±РѕСЂ С‚РµРєСЃС‚Р°: 60% вЂ” РєРѕСЂРѕС‚РєРёРµ С„СЂР°Р·С‹, 35% вЂ” СЃР»РѕР¶РЅРѕРµ РїСЂРµРґР»РѕР¶РµРЅРёРµ, 5% вЂ” РґР»РёРЅРЅС‹Р№ С‚РµРєСЃС‚.
+// Text selection: 60% short phrases, 35% complex sample, 5% long text.
 function pickText() {
   const r = Math.random();
   if (r < 0.6) {
-    return SHORT_SAMPLES[Math.floor(Math.random() * SHORT_SAMPLES.length)];
+    return TEXTS.short[Math.floor(Math.random() * TEXTS.short.length)];
   }
   if (r < 0.95) {
-    return COMPLEX_SAMPLE;
+    return TEXTS.complex;
   }
-  return LONG_TEXT;
+  return { text: LONG_TEXT, has_pd: true };
 }
 
-// РћРїРёСЃР°РЅРёСЏ РІСЃРµС… СЃС†РµРЅР°СЂРёРµРІ. Р’ options РїРѕРїР°РґР°РµС‚ С‚РѕР»СЊРєРѕ РІС‹Р±СЂР°РЅРЅС‹Р№ С‡РµСЂРµР· SCENARIO.
+// Descriptions of all scenarios. Only the one selected via SCENARIO goes into options.
 const ALL_SCENARIOS = {
   smoke: {
     executor: "constant-vus",
@@ -90,18 +75,19 @@ const ALL_SCENARIOS = {
 
 if (!ALL_SCENARIOS[SCENARIO]) {
   throw new Error(
-    `РќРµРёР·РІРµСЃС‚РЅС‹Р№ SCENARIO "${SCENARIO}". Р”РѕСЃС‚СѓРїРЅС‹Рµ СЃС†РµРЅР°СЂРёРё: ${Object.keys(ALL_SCENARIOS).join(", ")}.`,
+    `Unknown SCENARIO "${SCENARIO}". Available scenarios: ${Object.keys(ALL_SCENARIOS).join(", ")}.`,
   );
 }
 
 export const options = {
   scenarios: { [SCENARIO]: ALL_SCENARIOS[SCENARIO] },
-  // 429 РЅРµ СЃС‡РёС‚Р°РµС‚СЃСЏ РѕС€РёР±РєРѕР№: РїСЂРѕРІРµСЂСЏСЋС‰Р°СЏ СЃРёСЃС‚РµРјР° Р¶РґС‘С‚ Retry-After Рё РїРѕРІС‚РѕСЂСЏРµС‚.
+  // 429 is not treated as an error: the checker waits for Retry-After and retries.
   summaryTrendStats: ["avg", "min", "med", "p(90)", "p(95)", "p(99)", "max"],
   thresholds: {
     http_req_duration: ["p(95)<500"],
     http_req_failed: ["rate<0.01"],
     unmask_ok: ["rate>0.99"],
+    mask_hides_pd: ["rate>0.99"],
   },
 };
 
@@ -109,14 +95,15 @@ http.setResponseCallback(http.expectedStatuses(200, 429));
 
 const params = { headers: { "Content-Type": "application/json" }, timeout: "10s" };
 
-// РњРµС‚СЂРёРєРё k6.
+// k6 metrics.
 const unmaskOk = new Rate("unmask_ok");
+const maskHidesPd = new Rate("mask_hides_pd");
 const http429 = new Counter("http_429");
 const maskDuration = new Trend("mask_duration");
 const unmaskDuration = new Trend("unmask_duration");
 
-// POST СЃ СЂРµС‚СЂР°РµРј РЅР° 429: Р¶РґС‘Рј Retry-After (СЃРµРєСѓРЅРґС‹, РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 1), РјР°РєСЃРёРјСѓРј 2 РїРѕРІС‚РѕСЂР°.
-// Р•СЃР»Рё 429 РѕСЃС‚Р°Р»СЃСЏ вЂ” Р·Р°СЃС‡РёС‚С‹РІР°РµРј РІ http_429 Рё РІРѕР·РІСЂР°С‰Р°РµРј null (РёС‚РµСЂР°С†РёСЏ РїСЂРµСЂС‹РІР°РµС‚СЃСЏ).
+// POST with retry on 429: wait Retry-After (seconds, default 1), max 2 retries.
+// If 429 remains, count it into http_429 and return null (iteration is aborted).
 function postWithRetry(url, body) {
   let res = http.post(url, body, params);
   let attempts = 0;
@@ -134,23 +121,31 @@ function postWithRetry(url, body) {
 }
 
 export default function () {
-  const text = pickText();
+  const item = pickText();
   const id = `${__VU}-${__ITER}-${Date.now()}`;
 
-  // РњР°СЃРєРёСЂРѕРІР°РЅРёРµ.
-  const masked = postWithRetry(`${BASE_URL}/process`, JSON.stringify({ payload: text, payload_id: id }));
-  if (masked === null) return; // 429 РѕСЃС‚Р°Р»СЃСЏ РїРѕСЃР»Рµ СЂРµС‚СЂР°РµРІ вЂ” Р±РµР· РґРµРјР°СЃРєРёСЂРѕРІР°РЅРёСЏ.
+  // Masking.
+  const masked = postWithRetry(`${BASE_URL}/process`, JSON.stringify({ payload: item.text, payload_id: id }));
+  if (masked === null) return; // 429 remained after retries - no unmasking.
   if (!check(masked, { "mask 200": (r) => r.status === 200 })) return;
   maskDuration.add(masked.timings.duration);
 
-  // Р”РµРјР°СЃРєРёСЂРѕРІР°РЅРёРµ С‚РµРј Р¶Рµ payload_id Рё РїРѕР»СѓС‡РµРЅРЅРѕР№ РјР°СЃРєРѕР№.
+  // For texts that contain PD, masking must change the text.
+  if (item.has_pd) {
+    const changed = check(masked, {
+      "mask changes text with PD": (r) => r.json("result") !== item.text,
+    });
+    maskHidesPd.add(changed);
+  }
+
+  // Unmasking with the same payload_id and the received mask.
   const restored = postWithRetry(
     `${BASE_URL}/process`,
     JSON.stringify({ payload: masked.json("result"), payload_id: id }),
   );
-  if (restored === null) return; // 429 РѕСЃС‚Р°Р»СЃСЏ РїРѕСЃР»Рµ СЂРµС‚СЂР°РµРІ.
+  if (restored === null) return; // 429 remained after retries.
   const ok = check(restored, {
-    "unmask returns original": (r) => r.status === 200 && r.json("result") === text,
+    "unmask returns original": (r) => r.status === 200 && r.json("result") === item.text,
   });
   unmaskOk.add(ok);
   unmaskDuration.add(restored.timings.duration);

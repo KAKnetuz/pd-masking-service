@@ -18,6 +18,7 @@ POST /process, тело {"payload": "<строка>", "payload_id": "<строк
 6. Не трогать .env, секреты, Dockerfile и docker-compose.yml без явной просьбы.
 7. Делать только то, что просят в задаче. Без рефакторинга «заодно».
 8. Оболочка — Windows PowerShell: не используй &&, выполняй команды по одной или через ;.
+9. Файлы с кириллицей не записывать через PowerShell (Set-Content, Out-File, echo, >): PowerShell 5 портит кодировку. Только инструмент записи файлов или Python с encoding="utf-8".
 
 ## После каждого изменения
 - Запусти: ruff check . и pytest -q
