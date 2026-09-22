@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.core.detectors.address import AddressDetector
 from app.core.detectors.base import Detector
+from app.core.detectors.context_values import ContextValueDetector
 from app.core.detectors.dates import DateDetector
 from app.core.detectors.documents import ExtraDocumentDetector, IdentityDocumentDetector, IssuanceDetector
 from app.core.detectors.finance_contacts import CardDetector, ContactDetector, InnDetector
@@ -25,4 +26,5 @@ def default_detectors() -> tuple[Detector, ...]:
         FioDetector(),
         AddressDetector(),
         LabelledValueDetector(),
+        ContextValueDetector(),
     )

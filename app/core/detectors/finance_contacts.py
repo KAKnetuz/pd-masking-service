@@ -24,7 +24,7 @@ _PIN_RE = re.compile(
     r"(?:пин[\-\s]?код\w*|\bпин\b|\bpin(?:[\-\s]?code)?\b)\s*(?:от\s+)?(?:карты\s*)?[:\-–]?\s*(\d{4,6})(?!\d)",
     FLAGS,
 )
-_EXPIRY_VALUE = r"((?:0[1-9]|1[0-2])\s?[/.\-]\s?(?:\d{4}|\d{2}))(?![\d./])"
+_EXPIRY_VALUE = r"((?:0[1-9]|1[0-2])\s?[/.\-]\s?(?:\d{4}|\d{2}))(?![\d/]|\.\d)"
 _EXPIRY_CTX_RE = re.compile(
     r"(?:срок\w*\s+действия(?:\s+карты)?|exp(?:iry|iration)?(?:\s+date)?|valid\s+(?:thru|through|until))"
     r"\s*[:\-–.]?\s*" + _EXPIRY_VALUE,
@@ -43,6 +43,10 @@ _EXPIRY_BARE_RE = re.compile(r"(?<![\d/.])((?:0[1-9]|1[0-2])/\d{2})(?![\d/])")
 # --- ИНН ----------------------------------------------------------------------
 _INN_CTX_RE = re.compile(r"\bинн\b\s*(?:физ\w*\s+лиц\w*\s*)?[:№\-–]?\s*(\d{12}|\d{10})(?!\d)", FLAGS)
 _INN_BARE_RE = re.compile(r"(?<!\d)(\d{12})(?!\d)")
+# ИНН организации — не ПД: «Организация с ИНН …», «компания ООО …, ИНН …».
+_ORG_CUE_RE = re.compile(
+    r"организац|компани|контрагент|поставщик|юр\w*\s+лиц|\bооо\b|\bоао\b|\bзао\b|\bпао\b|\bао\b|\bип\b", FLAGS
+)
 
 # --- Контакты -----------------------------------------------------------------
 _EMAIL_RE = re.compile(
@@ -103,6 +107,8 @@ class InnDetector(Detector):
 
     def detect(self, text: str) -> Iterator[Entity | None]:
         for m in _INN_CTX_RE.finditer(text):
+            if cue_before(text, m.start(), _ORG_CUE_RE, window=40):
+                continue
             yield make_entity(PDType.INN, _group(m), priority=77)
         # ИНН физлица без слова «ИНН» — только при корректной контрольной сумме.
         for m in _INN_BARE_RE.finditer(text):

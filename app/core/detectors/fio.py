@@ -14,6 +14,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 from app.core.detectors.base import FLAGS, Detector, cue_before
+from app.core.detectors.name_span import extend_person_span
 from app.core.detectors.names_data import (
     FAMOUS_SURNAME_RE,
     NOT_SURNAMES,
@@ -48,14 +49,16 @@ _STRONG_CUE_RE = re.compile(
     r"клиент|заё?мщик|\bфио\b|заявител|держател|получател|паспорт|плательщик|вкладчик", FLAGS
 )
 
-_INITIALS_AFTER_RE = re.compile(r"([А-ЯЁ][а-яё]+(?:-[А-ЯЁ][а-яё]+)?)\s+([А-ЯЁ])\.\s?([А-ЯЁ])\.?")
+_INITIALS_AFTER_RE = re.compile(
+    r"([А-ЯЁ][а-яё]+(?:-[А-ЯЁ][а-яё]+)?)\s+([А-ЯЁ])\.\s?([А-ЯЁ])(?:\.|(?![А-ЯЁа-яё]))"
+)
 _INITIALS_BEFORE_RE = re.compile(
     r"(?<![А-Яа-яЁё])([А-ЯЁ])\.\s?([А-ЯЁ])\.\s?([А-ЯЁ][а-яё]+(?:-[А-ЯЁ][а-яё]+)?)"
 )
 
 _HOLDER_CUE_RE = re.compile(
     r"(?:держател\w*(?:\s+карты)?|имя\s+держателя(?:\s+карты)?|имя\s+(?:и\s+фамилия\s+)?на\s+карте"
-    r"|владел\w*\s+карты|card\s*holder(?:\s+name)?|name\s+on\s+card)\s*[:\-–—]?\s*"
+    r"|владел\w*\s+карты|эмбосс\w*\s+имя|card\s*holder(?:\s+name)?|name\s+on\s+card)\s*[:\-–—]?\s*[«\"]?"
     r"([A-Za-zА-ЯЁа-яё][A-Za-zА-ЯЁа-яё'-]+(?:\s+[A-Za-zА-ЯЁа-яё][A-Za-zА-ЯЁа-яё'-]+){1,2})",
     FLAGS,
 )
@@ -83,6 +86,14 @@ _NOT_NAME_WORDS = frozenset(
 )
 
 
+def _holder_word_ok(word: str) -> bool:
+    """Слово похоже на часть имени держателя: латиница, словарь имён/фамилий или «Слово с заглавной»."""
+    lower = word.lower()
+    by_dictionary = is_first_name(lower) or PATRONYMIC_RE.match(lower) is not None
+    by_surname = SURNAME_RE.match(lower) is not None and lower not in NOT_SURNAMES
+    return word.isascii() or by_dictionary or by_surname or (word[0].isupper() and not word.isupper())
+
+
 @dataclass(slots=True)
 class _Token:
     start: int
@@ -106,7 +117,7 @@ def _tokenize(text: str) -> list[_Token]:
                 end=m.end(),
                 text=word,
                 lower=lower,
-                capitalized=word[0].isupper(),
+                capitalized=word[0].isupper() and not (len(word) > 1 and word.isupper()),
                 first=is_first_name(lower),
                 patronymic=PATRONYMIC_RE.match(lower) is not None,
                 surname=SURNAME_RE.match(lower) is not None and lower not in NOT_SURNAMES,
@@ -124,6 +135,8 @@ def _is_surname(tok: _Token, strict: bool) -> bool:
     if tok.surname:
         return True
     # Фамилия без типичного суффикса («Ким», «Шмидт») — только с заглавной и рядом с отчеством.
+    if _CUE_RE.search(tok.text + " "):
+        return False
     return not strict and tok.capitalized and not tok.first and not tok.patronymic
 
 
@@ -157,7 +170,17 @@ class FioDetector(Detector):
             *self._by_cue(text, tokens),
             *self._card_holders(text),
         ]
-        return [e for e in candidates if e is not None and not self._is_excluded(text, e)]
+        kept = [e for e in candidates if e is not None and not self._is_excluded(text, e)]
+        return [self._extend(text, e) for e in kept]
+
+    @staticmethod
+    def _extend(text: str, entity: Entity) -> Entity | None:
+        if entity.pd_type is not PDType.FIO or len(entity.parts) != 1:
+            return entity
+        start, end = extend_person_span(text, entity.start, entity.end)
+        if (start, end) == (entity.start, entity.end):
+            return entity
+        return make_entity(PDType.FIO, [(start, end)], priority=entity.priority)
 
     @staticmethod
     def _by_morphology(text: str, tokens: list[_Token]) -> Iterator[Entity | None]:
@@ -220,6 +243,10 @@ class FioDetector(Detector):
                 words.pop()
             while words and words[0].group(0).lower() in _HOLDER_LEAD_STOPWORDS:
                 words.pop(0)
+            while words and not _holder_word_ok(words[-1].group(0)):
+                words.pop()
+            if any(not _holder_word_ok(w.group(0)) for w in words):
+                continue
             if len(words) >= 2:
                 yield make_entity(PDType.CARD_HOLDER, [(words[0].start(), words[-1].end())], priority=80)
         for m in _LATIN_HOLDER_RE.finditer(text):
