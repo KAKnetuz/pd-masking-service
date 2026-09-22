@@ -97,7 +97,6 @@ if (!ALL_SCENARIOS[SCENARIO]) {
 export const options = {
   scenarios: { [SCENARIO]: ALL_SCENARIOS[SCENARIO] },
   // 429 РЅРµ СЃС‡РёС‚Р°РµС‚СЃСЏ РѕС€РёР±РєРѕР№: РїСЂРѕРІРµСЂСЏСЋС‰Р°СЏ СЃРёСЃС‚РµРјР° Р¶РґС‘С‚ Retry-After Рё РїРѕРІС‚РѕСЂСЏРµС‚.
-  setResponseCallback: http.expectedStatuses(200, 429),
   summaryTrendStats: ["avg", "min", "med", "p(90)", "p(95)", "p(99)", "max"],
   thresholds: {
     http_req_duration: ["p(95)<500"],
@@ -105,6 +104,8 @@ export const options = {
     unmask_ok: ["rate>0.99"],
   },
 };
+
+http.setResponseCallback(http.expectedStatuses(200, 429));
 
 const params = { headers: { "Content-Type": "application/json" }, timeout: "10s" };
 
