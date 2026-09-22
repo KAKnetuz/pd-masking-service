@@ -8,6 +8,7 @@ from app.core.detectors.dates import DateDetector
 from app.core.detectors.documents import ExtraDocumentDetector, IdentityDocumentDetector, IssuanceDetector
 from app.core.detectors.finance_contacts import CardDetector, ContactDetector, InnDetector
 from app.core.detectors.fio import FioDetector
+from app.core.detectors.labelled import LabelledValueDetector
 from app.core.detectors.standalone import StandaloneValueDetector
 
 
@@ -23,4 +24,5 @@ def default_detectors() -> tuple[Detector, ...]:
         DateDetector(),
         FioDetector(),
         AddressDetector(),
+        LabelledValueDetector(),
     )

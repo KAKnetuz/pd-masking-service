@@ -82,8 +82,16 @@ _LATIN_STOPWORDS = frozenset(
 )
 
 
+# Артефакт выгрузки таблицы: целое число записано как дробное («4509123456.0»).
+_FLOAT_ARTIFACT_RE = re.compile(r"(\d+)\.0")
+
+
 def _strip(text: str) -> str:
-    return text.strip().rstrip(".,;!")
+    value = text.strip()
+    artifact = _FLOAT_ARTIFACT_RE.fullmatch(value)
+    if artifact:
+        return artifact.group(1)
+    return value.rstrip(".,;!")
 
 
 # --- Классификация «голого значения»: каждая ветка — отдельная проверка. -----

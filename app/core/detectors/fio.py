@@ -61,6 +61,10 @@ _HOLDER_CUE_RE = re.compile(
 )
 _HOLDER_WORD_RE = re.compile(r"[A-Za-zА-ЯЁа-яё'-]+")
 _HOLDER_STOPWORDS = frozenset({"карты", "номер", "срок", "cvv", "cvc", "пин", "pin", "код"})
+# Служебные слова сразу после метки: «Имя держателя указано как: …» — это не имя.
+_HOLDER_LEAD_STOPWORDS = frozenset(
+    {"указано", "указан", "указана", "как", "это", "является", "записано", "значится", "оформлена", "оформлено"}
+)
 
 # Латинское имя заглавными рядом с номером карты: «IVAN IVANOV». Слабая сущность.
 _LATIN_HOLDER_RE = re.compile(r"(?<![A-Za-z])([A-Z]{2,})\s+([A-Z]{2,})(?![A-Za-z])")
@@ -214,6 +218,8 @@ class FioDetector(Detector):
             words = list(_HOLDER_WORD_RE.finditer(text, m.start(1), m.end(1)))
             while words and words[-1].group(0).lower() in _HOLDER_STOPWORDS:
                 words.pop()
+            while words and words[0].group(0).lower() in _HOLDER_LEAD_STOPWORDS:
+                words.pop(0)
             if len(words) >= 2:
                 yield make_entity(PDType.CARD_HOLDER, [(words[0].start(), words[-1].end())], priority=80)
         for m in _LATIN_HOLDER_RE.finditer(text):
