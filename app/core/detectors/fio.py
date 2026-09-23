@@ -44,6 +44,14 @@ _NON_PD_CUE_RE = re.compile(
     FLAGS,
 )
 
+# Контекст после имени: «… была знаменитой балериной», «… — великий русский поэт».
+_NON_PD_AFTER_RE = re.compile(
+    r"^[\s,—\-]*(?:был[аио]?\s+|является\s+|—\s+)?(?:\w+\s+){0,2}?"
+    r"(?:знаменит\w*|известн\w*|велик\w*|балерин\w*|писател\w*|поэт\w*|композитор\w*|художни\w*"
+    r"|актёр\w*|актер\w*|актрис\w*|режиссёр\w*|режиссер\w*|учён\w*|спортсмен\w*|чемпион\w*)",
+    FLAGS,
+)
+
 # Сильный контекст: при нём даже «известная» фамилия считается ПД клиента.
 _STRONG_CUE_RE = re.compile(
     r"клиент|заё?мщик|\bфио\b|заявител|держател|получател|паспорт|плательщик|вкладчик", FLAGS
@@ -268,6 +276,8 @@ class FioDetector(Detector):
             return True
         if cue_before(text, entity.start, _NON_PD_CUE_RE, window=30):
             return True
+        if _NON_PD_AFTER_RE.match(text[entity.end : entity.end + 60]):
+            return not cue_before(text, entity.start, _STRONG_CUE_RE, window=40)
         words = [w.lower() for w in _WORD_RE.findall(text[entity.start : entity.end])]
         if any(FAMOUS_SURNAME_RE.match(w) for w in words):
             return not cue_before(text, entity.start, _STRONG_CUE_RE, window=40)

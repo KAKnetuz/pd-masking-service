@@ -8,6 +8,7 @@
 * регистр не важен.
 
 Покрывает: ПИН, CVV, ИНН (в т.ч. группами цифр), код подразделения, орган выдачи паспорта,
+адрес без сокращений после метки («адрес: Тверь, Лесная, 7, 15»),
 ФИО после меток роли человека («Получатель перевода: Сидоров П.»), ФИО и номера, записанные
 как всё сообщение («Мигель Гарсия», «45-09-123456»).
 """
@@ -76,6 +77,21 @@ _ISSUER_STOP = frozenset(
 )
 _ABBREVIATIONS = frozenset({"г.", "гор.", "обл.", "р-на.", "пос.", "с."})
 
+# --- Адрес без «г.», «ул.», «д.» после метки адреса -------------------------------------------
+# «адрес: Тверь, Лесная, 7, 15», «проживает: Тверь, Лесная 7-15»: индекс?, город, улица, дом, квартира?
+_BARE_ADDRESS_RE = re.compile(
+    r"(?i:адрес\w*(?:\s+(?:регистрации|проживания|места\s+жительства|клиента|доставки))?"
+    r"|прожива\w*(?:\s+по\s+адресу)?|зарегистрирован\w*(?:\s+по\s+адресу)?|прописан\w*(?:\s+по\s+адресу)?)"
+    r"\s*[:—\-]?\s*"
+    r"(?:(\d{6}),\s*)?"
+    r"([А-ЯЁ][а-яё]+(?:-[А-ЯЁа-яё]+)*(?:\s+[А-ЯЁ][а-яё]+)?),\s*"
+    r"([А-ЯЁ0-9][А-ЯЁа-яё0-9\-]*(?:\s+[А-ЯЁ][а-яё]+)?),?\s+"
+    r"(\d{1,4}[А-Яа-я]?)(?:\s*(?:,|-|/)\s*(\d{1,4}))?(?![\d\w])"
+)
+_ORG_ADDRESS_CUE_RE = re.compile(r"банк|отделени|офис|филиал|организац|компани|контрагент", FLAGS)
+_SENTENCE_END_RE = re.compile(r"[.!?]\s")
+_PRIORITY_ADDRESS = 55
+
 # --- ФИО после метки роли человека ----------------------------------------------------------
 _ROLE_LABEL_RE = re.compile(
     r"(?<![А-ЯЁа-яё])(?:получател\w*|отправител\w*|плательщик\w*|поручител\w*|соза[её]мщик\w*|за[её]мщик\w*"
@@ -142,6 +158,7 @@ class ContextValueDetector(Detector):
             PDType.DEPARTMENT_CODE,
             PDType.PASSPORT_ISSUER,
             PDType.FIO,
+            PDType.ADDRESS,
         }
     )
 
@@ -151,6 +168,7 @@ class ContextValueDetector(Detector):
         yield from self._issuers(text)
         yield from self._role_names(text)
         yield from self._bare_names(text)
+        yield from self._bare_addresses(text)
 
     # --- ПИН, CVV ---
     @staticmethod
@@ -170,7 +188,7 @@ class ContextValueDetector(Detector):
     @staticmethod
     def _numbers(text: str) -> Iterator[Entity | None]:
         for m in _INN_RE.finditer(text):
-            if not cue_before(text, m.start(), _ORG_CUE_RE, window=40):
+            if not cue_before(text, m.start(), _ORG_CUE_RE, window=40) and not _ORG_CUE_RE.search(m.group(0)):
                 yield _group_entity(PDType.INN, m, _PRIORITY_NUMBER)
         for pattern, pd_type in ((_WHOLE_INN_RE, PDType.INN), (_WHOLE_DOC_RE, PDType.PASSPORT)):
             m = pattern.match(text)
@@ -279,6 +297,17 @@ class ContextValueDetector(Detector):
                     end -= 1
                 start, end = extend_person_span(text, start, end)
                 yield make_entity(PDType.FIO, [(start, end)], priority=_PRIORITY_NAME)
+
+    # --- адрес без сокращений ---
+    @staticmethod
+    def _bare_addresses(text: str) -> Iterator[Entity | None]:
+        for m in _BARE_ADDRESS_RE.finditer(text):
+            sentence = max((s.end() for s in _SENTENCE_END_RE.finditer(text, 0, m.start())), default=0)
+            if _ORG_ADDRESS_CUE_RE.search(text, sentence, m.start()):
+                continue  # адрес отделения, офиса, организации — не ПД клиента
+            for idx in range(1, 6):
+                if m.group(idx):
+                    yield _group_entity(PDType.ADDRESS, m, _PRIORITY_ADDRESS, idx)
 
     # --- ФИО как всё сообщение ---
     @staticmethod

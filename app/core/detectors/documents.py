@@ -78,7 +78,8 @@ _BIRTH_PLACE_PREFIX = (
     r"(?:(?:г\.|гор\.|город|с\.|село|пос\.|посёлок|поселок|пгт\.?|д\.|дер\.|деревня|ст-ца|станица)\s*)?"
 )
 _BIRTH_PLACE_RE = re.compile(
-    r"(?:место\s+рождения|родил(?:ся|ась)\s+в(?![а-яё])|уроже?н(?:ец|ка)|\bм\.\s?р\.|place\s+of\s+birth)"
+    r"(?:место\s+рождения|родил(?:ся|ась)(?:\s+\d{1,2}[./]\d{1,2}[./]\d{2,4})?\s+в(?![а-яё])"
+    r"|уроже?н(?:ец|ка)|\bм\.\s?р\.|place\s+of\s+birth)"
     r"\s*[:\-–—]?\s*" + _BIRTH_PLACE_PREFIX + r"(" + _BIRTH_PLACE_VALUE + r")",
     FLAGS,
 )
@@ -90,7 +91,7 @@ _BIRTH_PLACE_GEO_WORDS = frozenset(
     {"область", "обл", "край", "края", "район", "района", "республика", "респ", "округ", "г", "гор", "город",
      "с", "село", "пос", "посёлок", "поселок", "пгт", "д", "дер", "деревня", "ст", "станица"}
 )
-_COLON_AFTER_LABEL_RE = re.compile(r"[^:\d\n]{0,60}:\s*")
+_COLON_AFTER_LABEL_RE = re.compile(r"[^:\d\n,]{0,60}:\s*")
 
 # --- Дополнительные документы (бонус ТЗ) -------------------------------------
 _SNILS_RE = re.compile(r"(?<![\d\-])(\d{3}[-\s]?\d{3}[-\s]?\d{3}[-\s]?\d{2})(?![\d\-])")
@@ -188,7 +189,8 @@ class IssuanceDetector(Detector):
     def _birth_places(cls, text: str) -> Iterator[Entity | None]:
         for m in _BIRTH_PLACE_RE.finditer(text):
             start, end = m.start(1), m.end(1)
-            colon = None if ":" in m.group(0) else _COLON_AFTER_LABEL_RE.match(text, start)
+            shift = ":" not in m.group(0) and m.group(0).lower().startswith("место")
+            colon = _COLON_AFTER_LABEL_RE.match(text, start) if shift else None
             if colon:
                 # «Место рождения бенефициара по договору: г. Алма-Ата» — значение после двоеточия.
                 value = _BIRTH_PLACE_VALUE_RE.match(text, colon.end())
